@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CASHIER
+  STOCKKEEPER
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+model User {
+  id        Int   @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  contact   Number
+  password  String
+  role      Role     @default(CASHIER)
+  colorCode String   @default(#000000)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sales     Sale[]
+}
+
+model Customer {
+  id      Int      @id @default(autoincrement())
+  name    String
+  contact String
+
+  payments Payment[]
+}
+
+model Supplier {
+  id      Int      @id @default(autoincrement())
+  name    String
+  contact String
+  brand   String
+  location  String
+  colorCode String   @default(#000000)
+
+  stockItems        Stock[]
+  items             Item[]
+  requests          SupplierRequestDetails[]
+  transactions      SupplierTransaction[]
+}
+
+model Stock {
+  id         Int      @id @default(autoincrement())
+  batchId    String
+  itemId     Int
+  quantity   Int
+  unitPrice  Float
+  sellPrice  Float
+
+  item     Item     @relation(fields: [itemId], references: [id])
+}
+
+model Invoice {
+  id           Int      @id @default(autoincrement())
+  batchId      String
+  itemId       Int
+  quantity     Int
+  saleInvoiceId Int
+
+  saleInvoice Payment? @relation(fields: [saleInvoiceId], references: [id])
+}
+
+model Payment {
+  id            Int       @id @default(autoincrement())
+  amount        Float
+  remainAmount  Float
+  date          DateTime
+  fileName      String
+  type          String
+  saleInvoiceId Int?
+  userId        Int?
+  customerContact String?
+
+  invoice  Invoice?  @relation(fields: [saleInvoiceId], references: [id])
+  user     User?     @relation(fields: [userId], references: [id])
+  customer Customer? @relation(fields: [customerContact], references: [contact])
+}
+
+model Item {
+  id         Int      @id @default(autoincrement())
+  name       String
+  supplierId Int
+  colorCode String   @default(#000000)
+
+  supplier Supplier @relation(fields: [supplierId], references: [id])
+  stock     Stock[]
+}
+
