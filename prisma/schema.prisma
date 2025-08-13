@@ -29,19 +29,21 @@ model User {
   id        Int   @id @default(autoincrement())
   name      String
   email     String   @unique
-  contact   Number
+  contact   String
   password  String
   role      Role     @default(CASHIER)
-  colorCode String   @default(#000000)
+  colorCode String   @default("#000000")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sales     Sale[]
+  payments Payment[]
+  refreshTokenHash String?
 }
 
 model Customer {
   id      Int      @id @default(autoincrement())
   name    String
-  contact String
+  contact String @unique
 
   payments Payment[]
 }
@@ -52,7 +54,7 @@ model Supplier {
   contact String
   brand   String
   location  String
-  colorCode String   @default(#000000)
+  colorCode String   @default("#000000")
 
   stockItems        Stock[]
   items             Item[]
@@ -69,6 +71,8 @@ model Stock {
   sellPrice  Float
 
   item     Item     @relation(fields: [itemId], references: [id])
+  supplierId Int
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
 }
 
 model Invoice {
@@ -92,7 +96,7 @@ model Payment {
   userId        Int?
   customerContact String?
 
-  invoice  Invoice?  @relation(fields: [saleInvoiceId], references: [id])
+  invoices  Invoice[]
   user     User?     @relation(fields: [userId], references: [id])
   customer Customer? @relation(fields: [customerContact], references: [contact])
 }
@@ -101,9 +105,34 @@ model Item {
   id         Int      @id @default(autoincrement())
   name       String
   supplierId Int
-  colorCode String   @default(#000000)
+  colorCode String   @default("#000000")
 
   supplier Supplier @relation(fields: [supplierId], references: [id])
   stock     Stock[]
 }
 
+// my code Inscode 
+
+model Sale {
+  id       Int      @id @default(autoincrement())
+  date     DateTime @default(now())
+  total    Float
+  userId   Int
+  user     User     @relation(fields: [userId], references: [id])
+  // add more fields & relations
+}
+
+model SupplierRequestDetails {
+  id         Int      @id @default(autoincrement())
+  supplierId Int
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  // other request fields
+}
+
+model SupplierTransaction {
+  id         Int      @id @default(autoincrement())
+  supplierId Int
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  amount     Float
+  date       DateTime @default(now())
+}
