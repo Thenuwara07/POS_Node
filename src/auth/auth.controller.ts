@@ -15,29 +15,46 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto'; 
 
-function refreshCookieOptions() {
-  const secure = String(process.env.COOKIE_SECURE || '').toLowerCase() === 'true';
-  const domain = process.env.COOKIE_DOMAIN || undefined;
-  // Match your refresh token TTL (default 7d)
-  const maxAgeMs = (() => {
-    // simple parse for env like "7d", "1d", "3600000"
-    const raw = process.env.JWT_REFRESH_EXPIRES || '7d';
-    if (/^\d+$/.test(raw)) return parseInt(raw, 10);
-    const m = /^(\d+)([smhd])$/.exec(raw);
-    if (!m) return 7 * 24 * 60 * 60 * 1000;
-    const n = parseInt(m[1], 10);
-    const unit = m[2];
-    const mult = unit === 's' ? 1000 : unit === 'm' ? 60000 : unit === 'h' ? 3600000 : 86400000;
-    return n * mult;
-  })();
+function parseRefreshTokenTTL(raw: string): number {
+  // Simple parse for numeric values (milliseconds)
+  if (/^\d+$/.test(raw)) return parseInt(raw, 10);
+  
+  // Parse values with units (e.g., "7d", "1h")
+  const match = /^(\d+)([smhd])$/.exec(raw);
+  if (!match) return 7 * 24 * 60 * 60 * 1000; // Default 7 days
+  
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+  
+  const multipliers = {
+    s: 1000,
+    m: 60000,
+    h: 3600000,
+    d: 86400000
+  };
+  
+  return value * (multipliers[unit as keyof typeof multipliers] || 86400000);
+}
 
+function refreshCookieOptions(): {
+    httpOnly: boolean;
+    secure: boolean;
+    sameSite: boolean | 'lax' | 'strict' | 'none';
+    domain?: string;
+    path: string;
+    maxAge: number;
+}{
+    const secure = String(process.env.COOKIE_SECURE || '').toLowerCase() === 'true';
+    const domain = process.env.COOKIE_DOMAIN || undefined;
+    const raw = process.env.JWT_REFRESH_EXPIRES || '7d';
+  
   return {
     httpOnly: true,
-    secure,                 // true in production with HTTPS
-    sameSite: secure ? ('none' as const) : ('lax' as const), // 'none' requires secure
+    secure,
+    sameSite: secure ? 'none' : 'lax', // Properly typed now
     domain,
     path: '/',
-    maxAge: maxAgeMs,
+    maxAge: parseRefreshTokenTTL(raw),
   };
 }
 
@@ -117,7 +134,7 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   @Get('me')
   me(@Req() req: any) {
-    return req.user; // { sub, email, role }
+    return req.user; 
   }
 
 }
