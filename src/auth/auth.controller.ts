@@ -59,8 +59,8 @@ export class AuthController {
 
   // Logout (invalidate refresh token in DB if you’re storing them)
   @Post('logout')
-  async logout(@Req() req: Request) {
-    // Optionally: await this.authService.logout((req as any).user?.sub);
+  async logout(@Req() req: any) {
+    await this.authService.logout(req.user?.sub); // ✅ call service
     return { message: 'Logged out' };
   }
 
