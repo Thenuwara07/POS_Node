@@ -12,15 +12,20 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  const origins = parseOrigins(process.env.CORS_ORIGIN);
-  app.enableCors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (origins.length === 0 || origins.includes(origin)) return cb(null, true);
-      return cb(new Error('Not allowed by CORS'), false);
-    },
-    credentials: true,
+    app.enableCors({
+    origin: true, // Your Flutter web port
+    credentials: true, // Required for cookies
+    exposedHeaders: ['set-cookie'], // Needed for cookie access
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Accept',
+      'origin'
+    ]
   });
+
 
   await app.listen(process.env.PORT ?? 3001);
 }
