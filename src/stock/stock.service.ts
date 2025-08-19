@@ -8,9 +8,9 @@ import { UpdateItemDto } from './dto/update-item.dto';
 export class StockService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Create item
-  async createItem(_stock: any, dto: CreateItemDto) {
-    // Optional: ensure supplier exists (avoid orphan FK errors)
+  // ADD ITEM
+  async createItem(_user: any, dto: CreateItemDto) {
+    // ensure supplier exists
     const supplier = await this.prisma.supplier.findUnique({
       where: { id: dto.supplierId },
       select: { id: true },
@@ -20,20 +20,44 @@ export class StockService {
     return this.prisma.item.create({
       data: {
         name: dto.name,
+        barcode: dto.barcode,
+        unit: dto.unit,
+        category: dto.category,
+        status: dto.status ?? undefined, // let DB default if not provided
+        cost: dto.cost,
+        markup: dto.markup,
+        salePrice: dto.salePrice,
         supplierId: dto.supplierId,
-        // undefined lets Prisma use the default if omitted
+        reorderLevel: dto.reorderLevel ?? undefined,
+        lowStockWarn: dto.lowStockWarn ?? undefined,
+        gradient: dto.gradient ?? null,
+        remark: dto.remark ?? null,
         colorCode: dto.colorCode ?? undefined,
       },
-      include: { supplier: true }, // add { stock: true } if you need it
+      include: { supplier: true },
     });
   }
 
-  // Update item
-  async updateItem(_stock: any, id: number, dto: UpdateItemDto) {
+  // GET ALL ITEMS (optional search/filter)
+  listItems(_user: any, opts?: { q?: string; supplierId?: number; category?: string; barcode?: string }) {
+    const where: any = {};
+    if (opts?.q) where.name = { contains: opts.q, mode: 'insensitive' };
+    if (opts?.supplierId) where.supplierId = opts.supplierId;
+    if (opts?.category) where.category = { equals: opts.category, mode: 'insensitive' };
+    if (opts?.barcode) where.barcode = opts.barcode;
+
+    return this.prisma.item.findMany({
+      where,
+      orderBy: { id: 'desc' },
+      include: { supplier: true },
+    });
+  }
+
+  // UPDATE ITEM
+  async updateItem(_user: any, id: number, dto: UpdateItemDto) {
     const existing = await this.prisma.item.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Item not found');
 
-    // If supplierId is changing, validate it
     if (dto.supplierId !== undefined) {
       const supplier = await this.prisma.supplier.findUnique({
         where: { id: dto.supplierId },
@@ -46,28 +70,26 @@ export class StockService {
       where: { id },
       data: {
         name: dto.name ?? undefined,
+        barcode: dto.barcode ?? undefined,
+        unit: dto.unit ?? undefined,
+        category: dto.category ?? undefined,
+        status: dto.status ?? undefined,
+        cost: dto.cost ?? undefined,
+        markup: dto.markup ?? undefined,
+        salePrice: dto.salePrice ?? undefined,
         supplierId: dto.supplierId ?? undefined,
+        reorderLevel: dto.reorderLevel ?? undefined,
+        lowStockWarn: dto.lowStockWarn ?? undefined,
+        gradient: dto.gradient ?? undefined, // keep null if passed null
+        remark: dto.remark ?? undefined,
         colorCode: dto.colorCode ?? undefined,
       },
       include: { supplier: true },
     });
   }
 
-  // List items with optional search & supplier filter
-  listItems(_stock: any, opts?: { q?: string; supplierId?: number }) {
-    const where: any = {};
-    if (opts?.q) where.name = { contains: opts.q, mode: 'insensitive' };
-    if (opts?.supplierId) where.supplierId = opts.supplierId;
-
-    return this.prisma.item.findMany({
-      where,
-      orderBy: { id: 'desc' },
-      include: { supplier: true },
-    });
-  }
-
-  // Get one
-  async getItem(_stock: any, id: number) {
+  // GET ITEM BY ID
+  async getItem(_user: any, id: number) {
     const item = await this.prisma.item.findUnique({
       where: { id },
       include: { supplier: true },
