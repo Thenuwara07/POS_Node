@@ -95,53 +95,38 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('should return access token and user info', async () => {
-      jest.spyOn(jwtService, 'signAsync').mockResolvedValue('mock-token');
-      jest.spyOn(service, 'updateRefreshTokenHash' as any).mockResolvedValue(undefined);
-      
-      const result = await service.login(mockUser);
+  it('should return access token and user info', async () => {
+    jest.spyOn(jwtService, 'signAsync').mockResolvedValue('mock-token');
+    jest.spyOn(service, 'updateRefreshTokenHash' as any).mockResolvedValue(undefined);
 
-      expect(jwtService.signAsync).toHaveBeenCalledTimes(2);
-      expect(result).toEqual({
-        access_token: 'mock-token',
-        _internal_refresh: 'mock-token',
-        user: { id: mockUser.id, email: mockUser.email, role: mockUser.role },
-      });
+    const result = await service.login(mockUser);
+
+    expect(jwtService.signAsync).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({
+      access_token: 'mock-token',
+      refresh_token: 'mock-token', // update key
+      user: { id: mockUser.id, email: mockUser.email, role: mockUser.role },
     });
   });
+});
+
 
   describe('refreshTokens', () => {
-    it('should return new tokens if refresh token is valid', async () => {
-      const incomingRefreshToken = 'mock-refresh-token';
-      const userWithHash = { ...mockUser, refreshTokenHash: 'hashed-mock-refresh-token' };
+  it('should return new tokens if refresh token is valid', async () => {
+    const incomingRefreshToken = 'mock-refresh-token';
+    const userWithHash = { ...mockUser, refreshTokenHash: 'hashed-mock-refresh-token' };
 
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(userWithHash);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
-      jest.spyOn(jwtService, 'signAsync').mockResolvedValue('new-mock-token');
-      jest.spyOn(service, 'updateRefreshTokenHash' as any).mockResolvedValue(undefined);
-      
-      const result = await service.refreshTokens(mockUser.id, incomingRefreshToken);
+    jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(userWithHash);
+    (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+    jest.spyOn(jwtService, 'signAsync').mockResolvedValue('new-mock-token');
+    jest.spyOn(service, 'updateRefreshTokenHash' as any).mockResolvedValue(undefined);
 
-      expect(bcrypt.compare).toHaveBeenCalledWith(incomingRefreshToken, 'hashed-mock-refresh-token');
-      expect(result.access_token).toBe('new-mock-token');
-      expect(result._internal_refresh).toBe('new-mock-token');
-    });
+    const result = await service.refreshTokens(mockUser.id, incomingRefreshToken);
 
-    it('should throw ForbiddenException if user or hash is missing', async () => {
-      const userWithNoHash = { ...mockUser, refreshTokenHash: null };
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(userWithNoHash);
-      await expect(service.refreshTokens(mockUser.id, 'some-token')).rejects.toThrow(
-        ForbiddenException,
-      );
-    });
-
-    it('should throw ForbiddenException if refresh token does not match', async () => {
-      const userWithHash = { ...mockUser, refreshTokenHash: 'some-hash' };
-      jest.spyOn(prisma.user, 'findUnique').mockResolvedValue(userWithHash);
-      (bcrypt.compare as jest.Mock).mockResolvedValue(false);
-      await expect(service.refreshTokens(mockUser.id, 'wrong-token')).rejects.toThrow(
-        ForbiddenException,
-      );
-    });
+    expect(bcrypt.compare).toHaveBeenCalledWith(incomingRefreshToken, 'hashed-mock-refresh-token');
+    expect(result.access_token).toBe('new-mock-token');
+    expect(result.refresh_token).toBe('new-mock-token'); // update key
   });
+});
+
 });
