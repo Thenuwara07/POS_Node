@@ -31,4 +31,14 @@ export class SupplierService {
   async remove(id: number) {
     return this.prisma.supplier.delete({ where: { id } });
   }
+
+  async updateStatus(id: number, active: boolean) {
+  return this.prisma.supplier.update({
+    where: { id },
+    data: {
+      status: active ? 'ACTIVE' : 'INACTIVE', // map boolean → enum
+    },
+  });
+}
+
 }
