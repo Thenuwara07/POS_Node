@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
-import { Role } from '../../generated/prisma'; // adjust if needed
+import { Role } from '../../generated/prisma';
 
 @Injectable()
 export class AuthService {
@@ -12,14 +12,6 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly prisma: PrismaService,
   ) {}
-
-  /* ---------- Helpers ---------- */
-
-  private stringToRole(roleString: string): Role {
-    const normalizedRole = roleString.toUpperCase() as keyof typeof Role;
-    if (normalizedRole in Role) return Role[normalizedRole];
-    throw new Error(`Invalid role: ${roleString}. Must be one of: ADMIN, CASHIER, STOCKKEEPER, MANAGER`);
-  }
 
   async hashPassword(password: string): Promise<string> {
     const salt = await bcrypt.genSalt(10);
@@ -30,9 +22,6 @@ export class AuthService {
     return bcrypt.compare(plain, hash);
   }
 
-  /* ---------- Core auth ---------- */
-
-  // Validate the user during login
   async validateUser(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) return null;
@@ -40,16 +29,15 @@ export class AuthService {
     const ok = await this.comparePassword(password, user.password);
     if (!ok) return null;
 
-    return user; // includes id, email, role, etc.
+    return user;
   }
 
-  // Sign access + refresh with different secrets/expiries
-  private async getTokens(user: { id: number; email: string; role: Role }) {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+  private async getTokens(user: { id: number; role: Role }) {
+    const payload = { sub: user.id, role: user.role };
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
-        secret: process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET_KEY || 'dev_access_secret',
+        secret: process.env.JWT_SECRET_KEY || 'dev_access_secret',
         expiresIn: process.env.JWT_ACCESS_EXPIRES || '15m',
       }),
       this.jwtService.signAsync(payload, {
@@ -61,7 +49,6 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  // Store hashed refresh token
   private async updateRefreshTokenHash(userId: number, refreshToken: string) {
     const hash = await bcrypt.hash(refreshToken, 10);
     await this.prisma.user.update({
@@ -70,7 +57,6 @@ export class AuthService {
     });
   }
 
-  // Invalidate refresh token
   async logout(userId: number) {
     await this.prisma.user.update({
       where: { id: userId },
@@ -78,30 +64,29 @@ export class AuthService {
     });
   }
 
-  // Login: issue tokens + persist hashed refresh token
+  // ✅ Updated login for Flutter: return refresh_token in response
   async login(user: any) {
     const tokens = await this.getTokens(user);
     await this.updateRefreshTokenHash(user.id, tokens.refreshToken);
 
-    // Controller will set the refresh token cookie; do NOT return it to client
     return {
       access_token: tokens.accessToken,
-      // expose refreshToken ONLY to controller layer so it can set cookie:
-      _internal_refresh: tokens.refreshToken,
+      refresh_token: tokens.refreshToken, // for Flutter secure storage
       user: { id: user.id, email: user.email, role: user.role },
     };
   }
 
-  // Refresh flow with rotation
+  // ✅ Updated refresh for Flutter
   async refreshTokens(userId: number, incomingRefreshToken: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, email: true, role: true, refreshTokenHash: true },
     });
+     
     if (!user || !user.refreshTokenHash) {
       throw new ForbiddenException('Access Denied');
     }
-
+         
     const rtMatches = await bcrypt.compare(incomingRefreshToken, user.refreshTokenHash);
     if (!rtMatches) {
       throw new ForbiddenException('Access Denied');
@@ -112,13 +97,11 @@ export class AuthService {
 
     return {
       access_token: tokens.accessToken,
+      refresh_token: tokens.refreshToken, // return to client
       role: user.role,
-      _internal_refresh: tokens.refreshToken, // controller sets cookie
       user: { id: user.id, email: user.email, role: user.role },
     };
   }
-
-  /* ---------- Registration ---------- */
 
   async register(createUserDto: CreateUserDto) {
     const { email, password, role, name, contact } = createUserDto;
@@ -127,14 +110,13 @@ export class AuthService {
     if (existing) throw new Error('User already exists');
 
     const hashedPassword = await this.hashPassword(password);
-    const roleEnum = typeof role === 'string' ? this.stringToRole(role) : role;
 
     const user = await this.prisma.user.create({
       data: {
         email,
         contact,
         password: hashedPassword,
-        role: roleEnum,
+        role,
         name,
       },
     });

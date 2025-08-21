@@ -15,9 +15,10 @@ datasource db {
 }
 
 enum Role {
-  ADMIN
-  CASHIER
-  STOCKKEEPER
+  Admin 
+  Cashier
+  Manager
+  StockKeeper
 }
 
 enum PaymentMethod {
@@ -31,7 +32,7 @@ model User {
   email     String   @unique
   contact   String
   password  String
-  role      Role     @default(CASHIER)
+  role      Role     @default(Cashier)
   colorCode String   @default("#000000")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -48,18 +49,32 @@ model Customer {
   payments Payment[]
 }
 
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
 model Supplier {
   id      Int      @id @default(autoincrement())
   name    String
   contact String
+  email     String?      // Optional email
+  address   String?      // Optional address
   brand   String
-  location  String
   colorCode String   @default("#000000")
-
+  location  String
+  status    SupplierStatus? 
   stockItems        Stock[]
   items             Item[]
   requests          SupplierRequestDetails[]
   transactions      SupplierTransaction[]
+  preferred     Boolean        @default(false)  // ✅ Preferred Supplier
+  paymentTerms  String?           // ✅ Payment Terms         
+  notes         String?          // ✅ Remarks/Notes              
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Stock {
@@ -102,14 +117,26 @@ model Payment {
 }
 
 model Item {
-  id         Int      @id @default(autoincrement())
-  name       String
-  supplierId Int
-  colorCode String   @default("#000000")
+  id            Int      @id @default(autoincrement())
+  name          String
+  barcode       String    @unique
+  unit          String
+  category      String
+  status        String    @default("Active") // "Active" or "Inactive"
+  cost          Float
+  markup        Float
+  salePrice     Float
+  supplierId    Int
+  reorderLevel  Int       @default(0)
+  lowStockWarn  Boolean   @default(true)
+  gradient      String?   // save gradient/color info (HEX or JSON if multiple colors)
+  remark        String?   @db.Text
+  colorCode     String    @default("#000000")
 
   supplier Supplier @relation(fields: [supplierId], references: [id])
   stock     Stock[]
 }
+
 
 // my code Inscode 
 
