@@ -1,4 +1,3 @@
-// test/mocks/user.mock.ts
 import { Role } from '../../generated/prisma';
 import { CreateUserDto } from '../../src/auth/dto/create-user.dto';
 
@@ -8,43 +7,52 @@ export const mockUser = {
   email: 'test@example.com',
   name: 'Test User',
   contact: '+1234567890',
-  password: 'hashedPassword123', // This would be hashed in real scenario
-  role: Role.CASHIER, // Default role
-  colorCode: '#3b82f6', // Example color
+  password: 'hashedPassword123', // hashed password
+  role: Role.Cashier,
+  colorCode: '#3b82f6',
   createdAt: new Date(),
   updatedAt: new Date(),
-  refreshTokenHash: null
+  refreshTokenHash: null,
 };
 
 // Mock DTO for registration (what client sends)
 export const mockUserDto: CreateUserDto = {
   email: 'test@example.com',
-  password: 'password123', // Raw password before hashing
+  password: 'password123',
   name: 'Test User',
   contact: '+1234567890',
-  role: Role.CASHIER
+  role: Role.Cashier,
 };
 
 // Mock successful registration response
 export const mockRegistrationResponse = {
   message: 'User registered successfully',
-  user: mockUser
+  user: mockUser,
 };
 
-// Mock AuthService implementation for register
-export const mockAuthService = {
-  register: jest.fn().mockResolvedValue(mockUser)
-};
-
+// Mock Prisma service
 export const mockPrismaService = {
   user: {
     create: jest.fn().mockResolvedValue(mockUser),
-    findUnique: jest.fn().mockImplementation(() => ({
-      then: jest.fn().mockResolvedValue(null) // Default: no user found
-    })),update: jest.fn().mockResolvedValue(mockUser),
-    // For duplicate email case:
-    $exists: {
-      user: jest.fn().mockResolvedValue(false)
-    }
-  }
+    findUnique: jest.fn().mockResolvedValue(null), // default: no user found
+    update: jest.fn().mockResolvedValue(mockUser),
+  },
+};
+
+// Optional: mock AuthService for controller tests
+export const mockAuthService = {
+  register: jest.fn().mockResolvedValue(mockUser),
+  validateUser: jest.fn().mockResolvedValue(mockUser),
+  login: jest.fn().mockResolvedValue({
+    access_token: 'mock_access_token',
+    refresh_token: 'mock_refresh_token',
+    user: mockUser,
+  }),
+  refreshTokens: jest.fn().mockResolvedValue({
+    access_token: 'new_access_token',
+    refresh_token: 'new_refresh_token',
+    role: mockUser.role,
+    user: mockUser,
+  }),
+  logout: jest.fn().mockResolvedValue(undefined),
 };

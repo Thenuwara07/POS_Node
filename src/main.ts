@@ -1,7 +1,7 @@
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import cookieParser from 'cookie-parser'; // <-- default import
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 function parseOrigins(csv?: string) {
   return csv ? csv.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -10,12 +10,10 @@ function parseOrigins(csv?: string) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  app.use(cookieParser());
 
     app.enableCors({
-    origin: true, // Your Flutter web port
+    origin: false, // Your Flutter web port
     credentials: true, // Required for cookies
-    exposedHeaders: ['set-cookie'], // Needed for cookie access
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
@@ -26,7 +24,23 @@ async function bootstrap() {
     ]
   });
 
+   // 🔥 Swagger setup
+  const config = new DocumentBuilder()
+    .setTitle('Auth API')
+    .setDescription('NestJS Authentication API (JWT-based)')
+    .setVersion('1.0')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'JWT-auth', // key name
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api-docs', app, document);
+
 
   await app.listen(process.env.PORT ?? 3001);
+  console.log(`Server is running on port ${process.env.PORT ?? 3001}`);
+
 }
 bootstrap();
