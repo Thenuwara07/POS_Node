@@ -1,46 +1,72 @@
-// src/stock/dto/update-item.dto.ts
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class UpdateItemDto {
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   name?: string;
 
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   barcode?: string;
 
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   unit?: string;
 
-  @IsString() @IsOptional()
-  category?: string;
+  @IsInt()
+  @IsOptional()
+  categoryId?: number;
 
-  @IsString() @IsOptional() @IsIn(['Active', 'Inactive'])
-  status?: string;
-
-  @IsNumber() @IsOptional() @Min(0)
-  cost?: number;
-
-  @IsNumber() @IsOptional()
-  markup?: number;
-
-  @IsNumber() @IsOptional() @Min(0)
-  salePrice?: number;
-
-  @IsInt() @IsOptional() @Min(1)
+  @IsInt()
+  @IsOptional()
   supplierId?: number;
 
-  @IsInt() @IsOptional() @Min(0)
+  @IsString()
+  @IsOptional()
+  @IsIn(['Active', 'Inactive'])
+  status?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  cost?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  markup?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  salePrice?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Min(0)
   reorderLevel?: number;
 
-  @IsBoolean() @IsOptional()
+  @IsBoolean()
+  @IsOptional()
   lowStockWarn?: boolean;
 
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   gradient?: string | null;
 
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   remark?: string | null;
 
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   colorCode?: string;
 }
