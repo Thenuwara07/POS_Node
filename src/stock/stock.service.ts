@@ -109,8 +109,17 @@
 //     const exists = await this.prisma.item.findUnique({ where: { id } });
 //     if (!exists) throw new NotFoundException('Item not found');
 
+
 //     return this.prisma.item.delete({
 //       where: { id },
 //     });
 //   }
 // }
+//sahan1
+
+//     return this.prisma.item.delete({
+//       where: { id },
+//     });
+//   }
+// }
+
