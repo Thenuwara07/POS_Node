@@ -18,6 +18,22 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { StockService } from './stock.service';
 import { CreateItemDto } from './dto/create-item.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiBody,
+  ApiQuery,
+} from '@nestjs/swagger';
+
+
+@ApiTags('Stock')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+// Ensure this matches your system (use same case string as your RolesGuard expects)
+@Roles('StockKeeper')
 
 import {
   ApiTags,
@@ -33,6 +49,7 @@ import {
 // @ApiBearerAuth('JWT-auth')
 // @UseGuards(AuthGuard('jwt'), RolesGuard)
 // @Roles('StockKeeper')
+
 @Controller('stock')
 export class StockController {
   constructor(private readonly stock: StockService) {}
@@ -41,18 +58,28 @@ export class StockController {
   @Post('items')
   @ApiOperation({ summary: 'Create a new item' })
   @ApiBody({ type: CreateItemDto })
-  @ApiResponse({ status: 201, description: 'Item created' })
-  createItem(@CurrentUser() _user: any, @Body() dto: CreateItemDto) {
-    // _user is kept for auditing later if you want, but not passed to service
-    return this.stock.createItem(dto); // ✅ service expects only dto
+
+  @ApiResponse({ status: 201, description: 'Item created successfully.' })
+  @ApiResponse({ status: 400, description: 'Validation error.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  createItem(@CurrentUser() user: any, @Body() dto: CreateItemDto) {
+    return this.stock.createItem(user, dto);
+
   }
 
   // UPDATE
   @Put('items/:id')
   @ApiOperation({ summary: 'Update an existing item' })
-  @ApiParam({ name: 'id', type: Number })
+
+  @ApiParam({ name: 'id', type: Number, required: true })
   @ApiBody({ type: UpdateItemDto })
-  @ApiResponse({ status: 200, description: 'Item updated' })
+  @ApiResponse({ status: 200, description: 'Item updated successfully.' })
+  @ApiResponse({ status: 400, description: 'Validation error.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Item not found.' })
+
   updateItem(
     @CurrentUser() _user: any,
     @Param('id', ParseIntPipe) id: number,
@@ -64,12 +91,15 @@ export class StockController {
   // LIST (with filters)
   @Get('items')
   @ApiOperation({ summary: 'List items with optional filters' })
-  @ApiQuery({ name: 'q', required: false, type: String })
-  @ApiQuery({ name: 'categoryId', required: false, type: Number })
+
+  @ApiQuery({ name: 'q', required: false, description: 'Free text search' })
   @ApiQuery({ name: 'supplierId', required: false, type: Number })
-  @ApiQuery({ name: 'skip', required: false, type: Number })
-  @ApiQuery({ name: 'take', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Items list' })
+  @ApiQuery({ name: 'category', required: false, type: String })
+  @ApiQuery({ name: 'barcode', required: false, type: String })
+  @ApiResponse({ status: 200, description: 'Items fetched successfully.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+
   listItems(
     @CurrentUser() _user: any,
     @Query('q') q?: string,
@@ -96,6 +126,16 @@ export class StockController {
 
   // GET BY ID
   @Get('items/:id')
+
+  @ApiOperation({ summary: 'Get a single item by ID' })
+  @ApiParam({ name: 'id', type: Number, required: true })
+  @ApiResponse({ status: 200, description: 'Item fetched successfully.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized.' })
+  @ApiResponse({ status: 403, description: 'Forbidden.' })
+  @ApiResponse({ status: 404, description: 'Item not found.' })
+  getItem(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
+    return this.stock.getItem(user, id);
+
   @ApiOperation({ summary: 'Get an item by ID' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'Single item' })
@@ -110,5 +150,6 @@ export class StockController {
   @ApiResponse({ status: 200, description: 'Item deleted' })
   deleteItem(@CurrentUser() _user: any, @Param('id', ParseIntPipe) id: number) {
     return this.stock.deleteItem(id); // ✅ service method is deleteItem(id)
+
   }
 }
