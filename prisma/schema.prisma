@@ -15,7 +15,7 @@ datasource db {
 }
 
 enum Role {
-  Admin 
+  Admin
   Cashier
   Manager
   StockKeeper
@@ -27,22 +27,22 @@ enum PaymentMethod {
 }
 
 model User {
-  id        Int   @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  contact   String
-  password  String
-  role      Role     @default(Cashier)
-  colorCode String   @default("#000000")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  sales     Sale[]
-  payments Payment[]
+  id               Int       @id @default(autoincrement())
+  name             String
+  email            String    @unique
+  contact          String
+  password         String
+  role             Role      @default(Cashier)
+  colorCode        String    @default("#000000")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  sales            Sale[]
+  payments         Payment[]
   refreshTokenHash String?
 }
 
 model Customer {
-  id      Int      @id @default(autoincrement())
+  id      Int    @id @default(autoincrement())
   name    String
   contact String @unique
 
@@ -56,96 +56,98 @@ enum SupplierStatus {
 }
 
 model Supplier {
-  id      Int      @id @default(autoincrement())
-  name    String
-  contact String
-  email     String?      // Optional email
-  address   String?      // Optional address
-  brand   String
-  colorCode String   @default("#000000")
-  location  String
-  status    SupplierStatus? 
-  stockItems        Stock[]
-  items             Item[]
-  requests          SupplierRequestDetails[]
-  transactions      SupplierTransaction[]
-  preferred     Boolean        @default(false)  // ✅ Preferred Supplier
-  paymentTerms  String?           // ✅ Payment Terms         
-  notes         String?          // ✅ Remarks/Notes              
+  id           Int                      @id @default(autoincrement())
+  name         String
+  contact      String
+  email        String? // Optional email
+  address      String? // Optional address
+  brand        String
+  colorCode    String                   @default("#000000")
+  location     String
+  status       SupplierStatus?
+  stockItems   Stock[]
+  items        Item[]
+  requests     SupplierRequestDetails[]
+  transactions SupplierTransaction[]
+  preferred    Boolean                  @default(false) // ✅ Preferred Supplier
+  paymentTerms String? // ✅ Payment Terms         
+  notes        String? // ✅ Remarks/Notes              
 
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Stock {
-  id         Int      @id @default(autoincrement())
-  batchId    String
-  itemId     Int
-  quantity   Int
-  unitPrice  Float
-  sellPrice  Float
+  id        Int    @id @default(autoincrement())
+  batchId   String
+  itemId    Int
+  quantity  Int
+  unitPrice Float
+  sellPrice Float
+  discountAmount Float   @default(0)  // ✅ new column
 
-  item     Item     @relation(fields: [itemId], references: [id])
+  item       Item     @relation(fields: [itemId], references: [id])
   supplierId Int
   supplier   Supplier @relation(fields: [supplierId], references: [id])
 }
 
 model Invoice {
-  id           Int      @id @default(autoincrement())
-  batchId      String
-  itemId       Int
-  quantity     Int
+  id            Int    @id @default(autoincrement())
+  batchId       String
+  itemId        Int
+  quantity      Int
   saleInvoiceId Int
 
   saleInvoice Payment? @relation(fields: [saleInvoiceId], references: [id])
 }
 
 model Payment {
-  id            Int       @id @default(autoincrement())
-  amount        Float
-  remainAmount  Float
-  date          DateTime
-  fileName      String
-  type          String
-  saleInvoiceId Int?
-  userId        Int?
+  id              Int      @id @default(autoincrement())
+  amount          Float
+  remainAmount    Float
+  date            DateTime
+  fileName        String
+  type            String
+  saleInvoiceId   Int?
+  userId          Int?
   customerContact String?
 
-  invoices  Invoice[]
+  invoices Invoice[]
   user     User?     @relation(fields: [userId], references: [id])
   customer Customer? @relation(fields: [customerContact], references: [contact])
 }
 
 model Item {
-  id            Int      @id @default(autoincrement())
-  name          String
-  barcode       String    @unique
-  unit          String
-  category      String
-  status        String    @default("Active") // "Active" or "Inactive"
-  cost          Float
-  markup        Float
-  salePrice     Float
-  supplierId    Int
-  reorderLevel  Int       @default(0)
-  lowStockWarn  Boolean   @default(true)
-  gradient      String?   // save gradient/color info (HEX or JSON if multiple colors)
-  remark        String?   @db.Text
-  colorCode     String    @default("#000000")
+  id           Int      @id @default(autoincrement())
+  name         String
+  barcode      String   @unique
+  categoryId   Int
+  category     Category @relation("CategoryItems", fields: [categoryId], references: [id]) // Reverse relation with the same relation name "CategoryItems"
+  supplierId   Int
+  reorderLevel Int      @default(0)
+  gradient     String? // save gradient/color info (HEX or JSON if multiple colors)
+  remark       String?  @db.Text
+  colorCode    String   @default("#000000")
 
   supplier Supplier @relation(fields: [supplierId], references: [id])
-  stock     Stock[]
+  stock    Stock[]
 }
 
+model Category {
+  id        Int    @id @default(autoincrement())
+  category  String
+  colorCode String
+  items     Item[] @relation("CategoryItems") // Relation to Item with a named relation
+}
 
 // my code Inscode 
 
 model Sale {
-  id       Int      @id @default(autoincrement())
-  date     DateTime @default(now())
-  total    Float
-  userId   Int
-  user     User     @relation(fields: [userId], references: [id])
+  id     Int      @id @default(autoincrement())
+  date   DateTime @default(now())
+  total  Float
+  userId Int
+  user   User     @relation(fields: [userId], references: [id])
   // add more fields & relations
 }
 

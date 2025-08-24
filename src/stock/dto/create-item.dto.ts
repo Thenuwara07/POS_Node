@@ -1,46 +1,68 @@
-// src/stock/dto/create-item.dto.ts
-import { IsBoolean, IsIn, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateItemDto {
-  @IsString() @IsNotEmpty()
-  name: string;
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
 
-  @IsString() @IsNotEmpty()
-  barcode: string;
+  @IsString()
+  @IsNotEmpty()
+  barcode!: string;
 
-  @IsString() @IsNotEmpty()
-  unit: string;
+  @IsString()
+  @IsNotEmpty()
+  unit!: string;
 
-  @IsString() @IsNotEmpty()
-  category: string;
+  @IsInt()
+  categoryId!: number;
 
-  @IsString() @IsOptional() @IsIn(['Active', 'Inactive'])
-  status?: string; // default = "Active" in DB
+  @IsInt()
+  supplierId!: number;
 
-  @IsNumber() @Min(0)
-  cost: number;
+  @IsString()
+  @IsOptional()
+  @IsIn(['Active', 'Inactive'])
+  status?: string;
 
   @IsNumber()
-  markup: number;
+  @Min(0)
+  cost!: number;
 
-  @IsNumber() @Min(0)
-  salePrice: number;
+  @IsNumber()
+  @Min(0)
+  markup!: number;
 
-  @IsInt() @Min(1)
-  supplierId: number;
+  @IsNumber()
+  @Min(0)
+  salePrice!: number;
 
-  @IsInt() @IsOptional() @Min(0)
-  reorderLevel?: number; // default 0
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  reorderLevel?: number;
 
-  @IsBoolean() @IsOptional()
-  lowStockWarn?: boolean; // default true
+  @IsBoolean()
+  @IsOptional()
+  lowStockWarn?: boolean;
 
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   gradient?: string | null;
 
-  @IsString() @IsOptional()
+  @IsString()
+  @IsOptional()
   remark?: string | null;
 
-  @IsString() @IsOptional()
-  colorCode?: string; // default "#000000"
+  @IsString()
+  @IsOptional()
+  colorCode?: string;
 }
