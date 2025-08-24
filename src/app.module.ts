@@ -6,7 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 
 import { CashierModule } from './cashier/cashier.module';
-import { StockModule } from './stock/stock.module';
+// import { StockModule } from './stock/stock.module';
 import { SupplierModule } from './supplier/supplier.module';
 
 @Module({
@@ -14,7 +14,6 @@ import { SupplierModule } from './supplier/supplier.module';
     PrismaModule,
     AuthModule,
     CashierModule,
-    StockModule,
     SupplierModule,
   ],
   controllers: [AppController],
