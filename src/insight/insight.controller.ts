@@ -1,7 +1,27 @@
-import { Controller, Get, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, HttpException, HttpStatus, UseGuards } from '@nestjs/common';
 import { InsightService } from './insight.service';
 import { TotalProductsDto, TotalSalesDto, TotalCustomersDto } from './dto/insight.dto';  // Make sure DTOs are in the right path
 
+
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { AuthGuard } from '@nestjs/passport';
+
+
+
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
+
+@ApiTags('insight')
+@ApiBearerAuth('JWT-auth')
+@UseGuards(AuthGuard('jwt'), RolesGuard)    
+@Roles('StockKeeper')
 @Controller('insight')
 export class InsightController {
   constructor(private readonly insightService: InsightService) {}
