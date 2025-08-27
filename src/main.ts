@@ -38,9 +38,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-
-  await app.listen(process.env.PORT ?? 3001);
-  console.log(`Server is running on port ${process.env.PORT ?? 3001}`);
+  if (await app.listen(process.env.PORT ?? 3001)) {
+    console.log(`Server is running on port ${process.env.PORT ?? 3001}`);
+  } else {
+    console.error('Failed to start server');
+  }
 
 }
 bootstrap();
