@@ -1,43 +1,38 @@
-import {
-  IsInt,
-  IsNotEmpty,
-  IsOptional,
-  IsString,
-  Min,
-  IsHexColor,
-} from 'class-validator';
 
-export class CreateItemDto {
-  @IsString()
-  @IsNotEmpty()
-  name!: string;
+// import {
+//   IsInt,
+//   IsNotEmpty,
+//   IsOptional,
+//   IsString,
+//   Min,
+//   IsHexColor,
+// } from 'class-validator';
 
-  @IsString()
-  @IsNotEmpty()
-  barcode!: string;
 
-  @IsInt()
-  @Min(1)
-  categoryId!: number;
 
-  @IsInt()
-  @Min(1)
-  supplierId!: number;
 
-  @IsInt()
-  @IsOptional()
-  @Min(0)
-  reorderLevel?: number; // defaults to 0 in DB if omitted
 
-  @IsString()
-  @IsOptional()
-  gradient?: string | null; // HEX string or JSON per your comment
+//   @IsInt()
+//   @Min(1)
+//   categoryId!: number;
 
-  @IsString()
-  @IsOptional()
-  remark?: string | null;
+//   @IsInt()
+//   @Min(1)
+//   supplierId!: number;
 
-  @IsHexColor()
-  @IsOptional()
-  colorCode?: string; // defaults to "#000000" in DB if omitted
-}
+//   @IsInt()
+//   @IsOptional()
+//   @Min(0)
+//   reorderLevel?: number; // defaults to 0 in DB if omitted
+
+//   @IsString()
+//   @IsOptional()
+//   gradient?: string | null; // HEX string or JSON per your comment
+
+
+
+//   @IsHexColor()
+//   @IsOptional()
+//   colorCode?: string; // defaults to "#000000" in DB if omitted
+// }
+
