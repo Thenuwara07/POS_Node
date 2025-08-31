@@ -14,6 +14,8 @@ import { UsersModule } from './users/users.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { InsightModule } from './insight/insight.module';
 
+import { InventoryModule } from './inventory/inventory.module';
+
 @Module({
   imports: [
     PrismaModule,
@@ -22,6 +24,8 @@ import { InsightModule } from './insight/insight.module';
     UsersModule,  // Remove the duplicate import
     SupplierModule,
     InsightModule,
+   
+    InventoryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
