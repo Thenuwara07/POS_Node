@@ -1,125 +1,143 @@
-// import { Injectable, NotFoundException } from '@nestjs/common';
-// import { PrismaService } from '../prisma/prisma.service';
-// import { CreateItemDto } from './dto/create-item.dto';
-// import { UpdateItemDto } from './dto/update-item.dto';
 
-// @Injectable()
-// export class StockService {
-//   constructor(private readonly prisma: PrismaService) {}
-
-//   async createItem(dto: CreateItemDto) {
-//     // Using CHECKED input: relations via nested connect
-//     return this.prisma.item.create({
-//       data: {
-//         name: dto.name,
-//         barcode: dto.barcode,
-//         unit: dto.unit,
-
-//         // Relations — use nested connects (do NOT send supplierId/categoryId directly)
-//         category: { connect: { id: dto.categoryId } },
-//         supplier: { connect: { id: dto.supplierId } },
-
-//         // Scalars
-//         status: dto.status ?? 'Active',
-//         cost: dto.cost,
-//         markup: dto.markup,
-//         salePrice: dto.salePrice,
-//         reorderLevel: dto.reorderLevel ?? undefined,
-//         lowStockWarn: dto.lowStockWarn ?? undefined,
-//         gradient: dto.gradient ?? null,
-//         remark: dto.remark ?? null,
-//         colorCode: dto.colorCode ?? '#000000',
-//       },
-//       include: { category: true, supplier: true },
-//     });
-//   }
-
-//   async updateItem(id: number, dto: UpdateItemDto) {
-//     // Ensure the item exists
-//     const exists = await this.prisma.item.findUnique({ where: { id } });
-//     if (!exists) throw new NotFoundException('Item not found');
-
-//     return this.prisma.item.update({
-//       where: { id },
-//       data: {
-//         // Scalars (undefined skips update)
-//         name: dto.name ?? undefined,
-//         barcode: dto.barcode ?? undefined,
-//         unit: dto.unit ?? undefined,
-//         status: dto.status ?? undefined,
-//         cost: dto.cost ?? undefined,
-//         markup: dto.markup ?? undefined,
-//         salePrice: dto.salePrice ?? undefined,
-//         reorderLevel: dto.reorderLevel ?? undefined,
-//         lowStockWarn: dto.lowStockWarn ?? undefined,
-//         gradient: dto.gradient ?? undefined, // send null explicitly if you want to clear it
-//         remark: dto.remark ?? undefined,
-//         colorCode: dto.colorCode ?? undefined,
-
-//         // Relations — only connect when provided
-//         category: dto.categoryId ? { connect: { id: dto.categoryId } } : undefined,
-//         supplier: dto.supplierId ? { connect: { id: dto.supplierId } } : undefined,
-//       },
-//       include: { category: true, supplier: true },
-//     });
-//   }
-
-//   async getItemById(id: number) {
-//     const item = await this.prisma.item.findUnique({
-//       where: { id },
-//       include: { category: true, supplier: true },
-//     });
-//     if (!item) throw new NotFoundException('Item not found');
-//     return item;
-//   }
-
-//   async getItems(params?: {
-//     q?: string;
-//     categoryId?: number;
-//     supplierId?: number;
-//     skip?: number;
-//     take?: number;
-//   }) {
-//     const { q, categoryId, supplierId, skip, take } = params ?? {};
-
-//     return this.prisma.item.findMany({
-//       where: {
-//         AND: [
-//           q
-//             ? {
-//                 OR: [
-//                   { name: { contains: q, mode: 'insensitive' } },
-//                   { barcode: { contains: q, mode: 'insensitive' } },
-//                 ],
-//               }
-//             : {},
-//           categoryId ? { category: { is: { id: categoryId } } } : {},
-//           supplierId ? { supplier: { is: { id: supplierId } } } : {},
-//         ],
-//       },
-//       include: { category: true, supplier: true },
-//       skip,
-//       take,
-//       orderBy: { id: 'desc' },
-//     });
-//   }
-
-//   async deleteItem(id: number) {
-//     // Optional: verify exists for nicer error
-//     const exists = await this.prisma.item.findUnique({ where: { id } });
-//     if (!exists) throw new NotFoundException('Item not found');
+// src/stock/stock.service.ts
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { CreateItemDto } from './dto/create-item.dto';
+import { CreateStockDto } from './dto/create-stock.dto';
+import { format } from 'date-fns';
 
 
-//     return this.prisma.item.delete({
-//       where: { id },
-//     });
-//   }
-// }
-//sahan1
 
-//     return this.prisma.item.delete({
-//       where: { id },
-//     });
-//   }
-// }
+  // ---- CATEGORY: Create ----
+  async createCategory(dto: CreateCategoryDto) {
+    try {
+      return await this.prisma.category.create({
+        data: {
+          category: dto.category,
+          colorCode: dto.colorCode,
+        },
+      });
+    } catch (err) {
+      this.handlePrismaError(err, 'createCategory');
+    }
+  }
 
+
+  // --- PURCHASE: Handle Supplier Request and Create Stock ---
+  async handlePurchaseRequest(dto: CreateStockDto) {
+    // Check if the supplier request is in 'PURCHASE' status
+    const supplierRequest = await this.prisma.supplierRequestDetails.findFirst({
+      where: {
+        supplierId: dto.supplierId,
+        status: 'PURCHASED',  // Check if the request status is 'PURCHASE'
+      },
+      include: { supplier: true },  // Include supplier info for batchId generation
+    });
+
+    if (!supplierRequest) {
+      throw new BadRequestException('No purchase request found or invalid status');
+    }
+
+    // Generate a batch ID: current date + supplierId (e.g., 202508261 for supplier ID 1)
+    const batchId = `${format(new Date(), 'yyyyMMdd')}${dto.supplierId}`;
+
+    // Create the stock
+    const stock = await this.prisma.stock.create({
+      data: {
+        batchId: batchId,
+        itemId: dto.itemId,
+        quantity: dto.quantity,  // Quantity from DTO
+        unitPrice: dto.unitPrice,  // Unit price from DTO
+        sellPrice: dto.sellPrice,  // Sell price from DTO
+        supplierId: dto.supplierId,
+      },
+    });
+
+    // Update the supplier request status to 'PURCHASE'
+    await this.prisma.supplierRequestDetails.update({
+      where: { id: supplierRequest.id },
+      data: { status: 'PURCHASED' },
+    });
+
+    // Return the created stock as a response
+    return stock;
+  }
+
+
+
+
+
+
+  // ---- ITEM: Create ----
+  async createItem(dto: CreateItemDto) {
+    // Validate foreign keys (early and explicit)
+    await this.ensureCategoryExists(dto.categoryId);
+    await this.ensureSupplierExists(dto.supplierId);
+
+    try {
+      return await this.prisma.item.create({
+        data: {
+          name: dto.name,
+          barcode: dto.barcode,
+          categoryId: dto.categoryId,
+          supplierId: dto.supplierId,
+          reorderLevel: dto.reorderLevel ?? undefined,
+          gradient: dto.gradient ?? undefined,
+          remark: dto.remark ?? undefined,
+          colorCode: dto.colorCode ?? undefined, // DB default if undefined
+        },
+        include: { category: true, supplier: true },
+      });
+    } catch (err) {
+      this.handlePrismaError(err, 'createItem');
+    }
+  }
+
+  // ---- Helpers ----
+  private async ensureCategoryExists(categoryId: number) {
+    const exists = await this.prisma.category.findUnique({ where: { id: categoryId } });
+    if (!exists) throw new BadRequestException(`Category ${categoryId} does not exist`);
+  }
+
+  private async ensureSupplierExists(supplierId: number) {
+    const exists = await this.prisma.supplier.findUnique({ where: { id: supplierId } });
+    if (!exists) throw new BadRequestException(`Supplier ${supplierId} does not exist`);
+  }
+
+  /**
+   * Translate Prisma errors -> Nest HTTP exceptions
+   */
+  private handlePrismaError(err: unknown, ctx: string): never {
+    if (err instanceof PrismaClientKnownRequestError) {
+      // Unique constraint violation (e.g., barcode or category name)
+      if (err.code === 'P2002') {
+        // meta.target often contains the unique index fields
+        const target = Array.isArray(err.meta?.target)
+          ? (err.meta!.target as string[]).join(', ')
+          : (err.meta?.target as string) ?? 'unique field';
+        throw new ConflictException(`Duplicate value for ${target}`);
+      }
+
+      // Foreign key constraint failure (should be rare here due to ensure*Exists)
+      if (err.code === 'P2003') {
+        throw new BadRequestException(`Invalid relation provided (${ctx}).`);
+      }
+
+      // Record not found (usually on update/delete; included for completeness)
+      if (err.code === 'P2025') {
+        throw new NotFoundException(`Requested resource not found (${ctx}).`);
+      }
+    }
+
+    // Fallback: hide internal details
+    throw new InternalServerErrorException('Unexpected error occurred');
+  }
+}

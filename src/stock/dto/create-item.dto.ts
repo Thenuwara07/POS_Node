@@ -1,68 +1,38 @@
-// import {
-//   IsBoolean,
-//   IsIn,
-//   IsInt,
-//   IsNotEmpty,
-//   IsNumber,
-//   IsOptional,
-//   IsString,
-//   Min,
-// } from 'class-validator';
 
-// export class CreateItemDto {
-//   @IsString()
-//   @IsNotEmpty()
-//   name!: string;
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Min,
+  IsHexColor,
+} from 'class-validator';
 
-//   @IsString()
-//   @IsNotEmpty()
-//   barcode!: string;
 
-//   @IsString()
-//   @IsNotEmpty()
-//   unit!: string;
 
-//   @IsInt()
-//   categoryId!: number;
 
-//   @IsInt()
-//   supplierId!: number;
 
-//   @IsString()
-//   @IsOptional()
-//   @IsIn(['Active', 'Inactive'])
-//   status?: string;
+  @IsInt()
+  @Min(1)
+  categoryId!: number;
 
-//   @IsNumber()
-//   @Min(0)
-//   cost!: number;
+  @IsInt()
+  @Min(1)
+  supplierId!: number;
 
-//   @IsNumber()
-//   @Min(0)
-//   markup!: number;
+  @IsInt()
+  @IsOptional()
+  @Min(0)
+  reorderLevel?: number; // defaults to 0 in DB if omitted
 
-//   @IsNumber()
-//   @Min(0)
-//   salePrice!: number;
+  @IsString()
+  @IsOptional()
+  gradient?: string | null; // HEX string or JSON per your comment
 
-//   @IsInt()
-//   @IsOptional()
-//   @Min(0)
-//   reorderLevel?: number;
 
-//   @IsBoolean()
-//   @IsOptional()
-//   lowStockWarn?: boolean;
 
-//   @IsString()
-//   @IsOptional()
-//   gradient?: string | null;
+  @IsHexColor()
+  @IsOptional()
+  colorCode?: string; // defaults to "#000000" in DB if omitted
+}
 
-//   @IsString()
-//   @IsOptional()
-//   remark?: string | null;
-
-//   @IsString()
-//   @IsOptional()
-//   colorCode?: string;
-// }
