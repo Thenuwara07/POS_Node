@@ -55,6 +55,13 @@ enum SupplierStatus {
   PENDING
 }
 
+enum RequestStatus {
+  PENDING
+  PURCHASED
+  REJECTED
+  COMPLETED
+}
+
 model Supplier {
   id           Int                      @id @default(autoincrement())
   name         String
@@ -155,7 +162,7 @@ model SupplierRequestDetails {
   id         Int      @id @default(autoincrement())
   supplierId Int
   supplier   Supplier @relation(fields: [supplierId], references: [id])
-  // other request fields
+  status     RequestStatus
 }
 
 model SupplierTransaction {
