@@ -18,6 +18,8 @@ import { format } from 'date-fns';
 export class StockService {
   constructor(private readonly prisma: PrismaService) {}
 
+
+  
   // ---- CATEGORY: Create ----
   async createCategory(dto: CreateCategoryDto) {
     try {
