@@ -1,3 +1,4 @@
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { StockController } from './stock.controller';
 import { StockService } from './stock.service';
@@ -7,9 +8,8 @@ import { CreateItemDto } from './dto/create-item.dto';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 
-describe('StockController', () => {
-  let controller: StockController;
-  let service: StockService;
+
+
 
   const mockStockService = {
     createCategory: jest.fn(),
@@ -29,9 +29,7 @@ describe('StockController', () => {
       ],
     }).compile();
 
-    controller = module.get<StockController>(StockController);
-    service = module.get<StockService>(StockService);
-  });
+
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
@@ -111,3 +109,4 @@ describe('StockController', () => {
   });
 
 });
+

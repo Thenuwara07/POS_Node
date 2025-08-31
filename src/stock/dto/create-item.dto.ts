@@ -1,3 +1,4 @@
+
 import {
   IsInt,
   IsNotEmpty,
@@ -7,14 +8,9 @@ import {
   IsHexColor,
 } from 'class-validator';
 
-export class CreateItemDto {
-  @IsString()
-  @IsNotEmpty()
-  name!: string;
 
-  @IsString()
-  @IsNotEmpty()
-  barcode!: string;
+
+
 
   @IsInt()
   @Min(1)
@@ -33,11 +29,10 @@ export class CreateItemDto {
   @IsOptional()
   gradient?: string | null; // HEX string or JSON per your comment
 
-  @IsString()
-  @IsOptional()
-  remark?: string | null;
+
 
   @IsHexColor()
   @IsOptional()
   colorCode?: string; // defaults to "#000000" in DB if omitted
 }
+

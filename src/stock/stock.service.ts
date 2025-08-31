@@ -1,3 +1,4 @@
+
 // src/stock/stock.service.ts
 import {
   BadRequestException,
@@ -14,9 +15,6 @@ import { CreateStockDto } from './dto/create-stock.dto';
 import { format } from 'date-fns';
 
 
-@Injectable()
-export class StockService {
-  constructor(private readonly prisma: PrismaService) {}
 
   // ---- CATEGORY: Create ----
   async createCategory(dto: CreateCategoryDto) {
