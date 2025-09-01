@@ -6,35 +6,66 @@ import { ItemDto } from './dto/total-items.dto';
 export class InventoryService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Returns: id, name, quantity (sum of stock), unitPrice/sellPrice (from latest stock),
+   * totalSales = quantity * sellPrice
+   */
   async getAllItems(): Promise<ItemDto[]> {
+    // Basic item list (id + name)
     const items = await this.prisma.item.findMany({
-      include: {
-        category: true,  // Include category info
-        supplier: true,  // Include supplier info
-      },
-      orderBy: { id: 'asc' },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' }, // matches Name ↑ in your UI
+    });
+    if (items.length === 0) return [];
+
+    const itemIds = items.map(i => i.id);
+
+    // 1) Sum quantity per item
+    const qtyAgg = await this.prisma.stock.groupBy({
+      by: ['itemId'],
+      _sum: { quantity: true },
+      where: { itemId: { in: itemIds } },
+    });
+    const qtyMap = new Map<number, number>(
+      qtyAgg.map(g => [g.itemId, g._sum.quantity ?? 0]),
+    );
+
+    // 2) Latest stock row per item (by max id), to pick current prices
+    const latestIdPerItem = await this.prisma.stock.groupBy({
+      by: ['itemId'],
+      _max: { id: true },
+      where: { itemId: { in: itemIds } },
+    });
+    const latestIds = latestIdPerItem
+      .map(g => g._max.id)
+      .filter((v): v is number => typeof v === 'number');
+
+    const latestStocks = latestIds.length
+      ? await this.prisma.stock.findMany({
+          where: { id: { in: latestIds } },
+          select: { itemId: true, unitPrice: true, sellPrice: true },
+        })
+      : [];
+
+    const priceMap = new Map<number, { unitPrice: number; sellPrice: number }>();
+    for (const s of latestStocks) {
+      priceMap.set(s.itemId, { unitPrice: s.unitPrice ?? 0, sellPrice: s.sellPrice ?? 0 });
+    }
+
+    // 3) Build response rows
+    const rows: ItemDto[] = items.map(it => {
+      const quantity = qtyMap.get(it.id) ?? 0;
+      const prices = priceMap.get(it.id) ?? { unitPrice: 0, sellPrice: 0 };
+      return {
+        id: it.id,
+        name: it.name,
+        quantity,
+        unitPrice: prices.unitPrice,
+        sellPrice: prices.sellPrice,
+        totalSales: quantity * prices.sellPrice,
+      };
     });
 
-    // Map Prisma model to DTO
-    return items.map((item) => ({
-      id: item.id,
-      name: item.name,
-      barcode: item.barcode,
-      category: {
-        id: item.category.id,
-        category: item.category.category,
-        colorCode: item.category.colorCode,
-      },
-      supplier: {
-        id: item.supplier.id,
-        name: item.supplier.name,
-        contact: item.supplier.contact,
-        colorCode: item.supplier.colorCode,
-      },
-      reorderLevel: item.reorderLevel,
-      gradient: item.gradient ?? undefined,
-      remark: item.remark ?? undefined,
-      colorCode: item.colorCode,
-    }));
+    return rows;
   }
 }

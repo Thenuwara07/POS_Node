@@ -12,7 +12,7 @@ async function bootstrap() {
 
 
     app.enableCors({
-    origin: false, // Your Flutter web port
+    origin: '*', // Your Flutter web port
     credentials: true, // Required for cookies
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
