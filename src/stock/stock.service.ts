@@ -142,4 +142,19 @@ export class StockService {
     // Fallback: hide internal details
     throw new InternalServerErrorException('Unexpected error occurred');
   }
+
+
+
+  // GET all categories (alphabetical)
+  async listCategories() {
+    return this.prisma.category.findMany({
+      orderBy: { category: 'asc' },
+      // If you want item counts too, uncomment:
+      // include: { _count: { select: { items: true } } },
+    });
+  }
+
+
+
+
 }
