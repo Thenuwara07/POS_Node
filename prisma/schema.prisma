@@ -1,9 +1,7 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// This is your Prisma schema file.
+// DB: PostgreSQL
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// =================== GENERATOR & DATASOURCE ===================
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -14,6 +12,7 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =================== ENUMS ===================
 enum Role {
   Admin
   Cashier
@@ -26,6 +25,26 @@ enum PaymentMethod {
   CARD
 }
 
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+enum RequestStatus {
+  PENDING
+  PURCHASED
+  REJECTED
+  COMPLETED
+}
+
+// ===== NEW (for credit ledger) =====
+enum CreditEntryType {
+  INVOICE     // credit extended (usually at sale time)
+  SETTLEMENT  // payment received against credit
+}
+
+// =================== MODELS ===================
 model User {
   id               Int       @id @default(autoincrement())
   name             String
@@ -49,25 +68,12 @@ model Customer {
   payments Payment[]
 }
 
-enum SupplierStatus {
-  ACTIVE
-  INACTIVE
-  PENDING
-}
-
-enum RequestStatus {
-  PENDING
-  PURCHASED
-  REJECTED
-  COMPLETED
-}
-
 model Supplier {
   id           Int                      @id @default(autoincrement())
   name         String
   contact      String
-  email        String? // Optional email
-  address      String? // Optional address
+  email        String?
+  address      String?
   brand        String
   colorCode    String                   @default("#000000")
   location     String
@@ -76,22 +82,22 @@ model Supplier {
   items        Item[]
   requests     SupplierRequestDetails[]
   transactions SupplierTransaction[]
-  preferred    Boolean                  @default(false) // ✅ Preferred Supplier
-  paymentTerms String? // ✅ Payment Terms         
-  notes        String? // ✅ Remarks/Notes              
+  preferred    Boolean                  @default(false)
+  paymentTerms String?
+  notes        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model Stock {
-  id        Int    @id @default(autoincrement())
-  batchId   String
-  itemId    Int
-  quantity  Int
-  unitPrice Float
-  sellPrice Float
-  discountAmount Float   @default(0)  // ✅ new column
+  id             Int     @id @default(autoincrement())
+  batchId        String
+  itemId         Int
+  quantity       Int
+  unitPrice      Float
+  sellPrice      Float
+  discountAmount Float   @default(0)
 
   item       Item     @relation(fields: [itemId], references: [id])
   supplierId Int
@@ -122,6 +128,9 @@ model Payment {
   invoices Invoice[]
   user     User?     @relation(fields: [userId], references: [id])
   customer Customer? @relation(fields: [customerContact], references: [contact])
+
+  // ---- NEW: back-relation for CreditEntry.payment (no DB column created) ----
+  creditEntries CreditEntry[] @relation("PaymentCreditEntries")
 }
 
 model Item {
@@ -129,10 +138,10 @@ model Item {
   name         String
   barcode      String   @unique
   categoryId   Int
-  category     Category @relation("CategoryItems", fields: [categoryId], references: [id]) // Reverse relation with the same relation name "CategoryItems"
+  category     Category @relation("CategoryItems", fields: [categoryId], references: [id])
   supplierId   Int
   reorderLevel Int      @default(0)
-  gradient     String? // save gradient/color info (HEX or JSON if multiple colors)
+  gradient     String?
   remark       String?  @db.Text
   colorCode    String   @default("#000000")
 
@@ -144,18 +153,16 @@ model Category {
   id        Int    @id @default(autoincrement())
   category  String
   colorCode String
-  items     Item[] @relation("CategoryItems") // Relation to Item with a named relation
+  items     Item[] @relation("CategoryItems")
 }
 
 // my code Inscode 
-
 model Sale {
   id     Int      @id @default(autoincrement())
   date   DateTime @default(now())
   total  Float
   userId Int
   user   User     @relation(fields: [userId], references: [id])
-  // add more fields & relations
 }
 
 model SupplierRequestDetails {
@@ -171,4 +178,34 @@ model SupplierTransaction {
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   amount     Float
   date       DateTime @default(now())
+}
+
+// =================== NEW: CREDITORS & LEDGER ===================
+model Creditor {
+  id        Int           @id @default(autoincrement())
+  name      String
+  phone     String        @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  credits   CreditEntry[]
+}
+
+model CreditEntry {
+  id         Int             @id @default(autoincrement())
+  entryType  CreditEntryType
+  refNo      String
+  amount     Float
+  date       DateTime        @default(now())
+
+  // Relations
+  creditorId Int
+  creditor   Creditor        @relation(fields: [creditorId], references: [id], onDelete: Restrict)
+
+  // Optional link back to Payment (requires back-relation field on Payment)
+  paymentId  Int?
+  payment    Payment?        @relation("PaymentCreditEntries", fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@index([creditorId])
+  @@index([paymentId])
 }

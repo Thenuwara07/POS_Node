@@ -1,20 +1,8 @@
 export class ItemDto {
-  id: number;
-  name: string;
-  barcode: string;
-  category: {
-    id: number;
-    category: string;
-    colorCode: string;
-  };
-  supplier: {
-    id: number;
-    name: string;
-    contact: string;
-    colorCode: string;
-  };
-  reorderLevel: number;
-  gradient?: string;
-  remark?: string;
-  colorCode: string;
+  id: number;          // Item ID
+  name: string;        // Item Name
+  quantity: number;    // Sum of all Stock.quantity for this item
+  unitPrice: number;   // From latest Stock row for this item
+  sellPrice: number;   // From latest Stock row for this item
+  totalSales: number;  // quantity * sellPrice
 }
