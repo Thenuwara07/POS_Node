@@ -1,155 +1,261 @@
-// src/stock/stock.controller.ts
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Post,
-  Put,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Roles } from '../auth/roles.decorator';
-import { RolesGuard } from '../auth/roles.guard';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { StockService } from './stock.service';
-import { CreateItemDto } from './dto/create-item.dto';
-import { UpdateItemDto } from './dto/update-item.dto';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-  ApiBody,
-  ApiQuery,
-} from '@nestjs/swagger';
+// import {
+//   Body,
+//   Controller,
+//   Get,
+//   InternalServerErrorException,
+//   Logger,
+//   Post,
+//   UseGuards,
+//   UsePipes,
+//   ValidationPipe,
+// } from '@nestjs/common';
+// import { AuthGuard } from '@nestjs/passport';
+// import { Roles } from '../auth/roles.decorator';
+// import { RolesGuard } from '../auth/roles.guard';
+// import { StockService } from './stock.service';
+// import { CreateCategoryDto } from './dto/create-category.dto';
+// import { CreateItemDto } from './dto/create-item.dto';
+// import { CreateStockDto } from './dto/create-stock.dto';
 
-
-@ApiTags('Stock')
-@ApiBearerAuth('JWT-auth')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-// Ensure this matches your system (use same case string as your RolesGuard expects)
-@Roles('StockKeeper')
-
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiParam,
-  ApiBody,
-  ApiQuery,
-} from '@nestjs/swagger';
+// import {
+//   ApiBearerAuth,
+//   ApiBadRequestResponse,
+//   ApiConflictResponse,
+//   ApiCreatedResponse,
+//   ApiForbiddenResponse,
+//   ApiOperation,
+//   ApiTags,
+//   ApiUnauthorizedResponse,
+//   ApiInternalServerErrorResponse,
+//   ApiBody,
+// } from '@nestjs/swagger';
 
 // @ApiTags('Stock')
 // @ApiBearerAuth('JWT-auth')
 // @UseGuards(AuthGuard('jwt'), RolesGuard)
 // @Roles('StockKeeper')
+// @Controller('stock')
+// @UsePipes(
+//   // Best practice for request validation in controllers
+//   new ValidationPipe({
+//     whitelist: true,              // strip unknown props
+//     forbidNonWhitelisted: true,   // 400 if extra props are sent
+//     transform: true,              // transform primitives
+//   }),
+// )
+// export class StockController {
+//   private readonly logger = new Logger(StockController.name);
 
+//   constructor(private readonly stock: StockService) {}
+
+//   // --- CATEGORY: Create ---
+//   @Post('categories')
+//   @ApiOperation({ summary: 'Create a new category' })
+//   @ApiBody({ type: CreateCategoryDto })
+//   @ApiCreatedResponse({ description: 'Category created.' })
+//   @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+//   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+//   @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+//   @ApiConflictResponse({ description: 'Duplicate category (name/code).' })
+//   @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+//   async createCategory(@Body() dto: CreateCategoryDto) {
+//     try {
+//       return await this.stock.createCategory(dto);
+//     } catch (err: any) {
+//       // Let known HttpExceptions bubble up; wrap unknowns
+//       if (err?.status && err?.response) throw err;
+//       this.logger.error('Failed to create category', err?.stack || err);
+//       throw new InternalServerErrorException('Failed to create category');
+//     }
+//   }
+
+//   // --- ITEM: Create ---
+//   @Post('createItem')
+//   @ApiOperation({ summary: 'Create a new item' })
+//   @ApiBody({ type: CreateItemDto })
+//   @ApiCreatedResponse({ description: 'Item created.' })
+//   @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+//   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+//   @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+//   @ApiConflictResponse({ description: 'Duplicate barcode or unique field.' })
+//   @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+//   async createItem(@Body() dto: CreateItemDto) {
+//     try {
+//       return await this.stock.createItem(dto);
+//     } catch (err: any) {
+//       if (err?.status && err?.response) throw err; // known HttpException from service
+//       this.logger.error('Failed to create item', err?.stack || err);
+//       throw new InternalServerErrorException('Failed to create item');
+//     }
+//   }
+
+
+//   // --- PURCHASE: Handle Supplier Request and Create Stock ---
+//   @Post('purchaseRequest')
+//   @ApiOperation({ summary: 'Handle supplier purchase request and create stock' })
+//   @ApiBody({ type: CreateStockDto })
+//   @ApiCreatedResponse({ description: 'Stock created and request updated.' })
+//   async handlePurchaseRequest(@Body() dto: CreateStockDto) {
+//     try {
+//       return await this.stock.handlePurchaseRequest(dto);
+//     } catch (err: any) {
+//       // Let known HttpExceptions bubble up; wrap unknowns
+//       if (err?.status && err?.response) throw err;
+//       this.logger.error('Failed to handle purchase request', err?.stack || err);
+//       throw new InternalServerErrorException('Failed to handle purchase request');
+//     }
+//   }
+
+
+//   // GET /stock/categories
+//   @Get('categories')
+//   @ApiOperation({ summary: 'List all categories' })
+//   // @ApiOkResponse({ description: 'Categories fetched.' })
+//   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+//   @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+//   async listCategories() {
+//     return this.stock.listCategories();
+//   }
+// }
+
+
+
+
+
+import {
+  Body,
+  Controller,
+  Get,
+  InternalServerErrorException,
+  Logger,
+  Post,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { StockService } from './stock.service';
+import { CreateCategoryDto } from './dto/create-category.dto';
+import { CreateItemDto } from './dto/create-item.dto';
+import { CreateStockDto } from './dto/create-stock.dto';
+
+import {
+  ApiBearerAuth,
+  ApiBadRequestResponse,
+  ApiConflictResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+  ApiInternalServerErrorResponse,
+  ApiBody,
+} from '@nestjs/swagger';
+
+@ApiTags('Stock')
 @Controller('stock')
+@UsePipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+)
 export class StockController {
+  private readonly logger = new Logger(StockController.name);
+
   constructor(private readonly stock: StockService) {}
 
-  // CREATE
-  @Post('items')
+  // --- CATEGORY: Create (AUTH REQUIRED) ---
+  @Post('categories')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('StockKeeper')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Create a new category' })
+  @ApiBody({ type: CreateCategoryDto })
+  @ApiCreatedResponse({ description: 'Category created.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiConflictResponse({ description: 'Duplicate category (name/code).' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async createCategory(@Body() dto: CreateCategoryDto) {
+    try {
+      return await this.stock.createCategory(dto);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to create category', err?.stack || err);
+      throw new InternalServerErrorException('Failed to create category');
+    }
+  }
+
+  // --- ITEM: Create (AUTH REQUIRED) ---
+  @Post('createItem')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('StockKeeper')
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new item' })
   @ApiBody({ type: CreateItemDto })
-
-  @ApiResponse({ status: 201, description: 'Item created successfully.' })
-  @ApiResponse({ status: 400, description: 'Validation error.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-  createItem(@CurrentUser() user: any, @Body() dto: CreateItemDto) {
-    return this.stock.createItem(user, dto);
-
+  @ApiCreatedResponse({ description: 'Item created.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiConflictResponse({ description: 'Duplicate barcode or unique field.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async createItem(@Body() dto: CreateItemDto) {
+    try {
+      return await this.stock.createItem(dto);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to create item', err?.stack || err);
+      throw new InternalServerErrorException('Failed to create item');
+    }
   }
 
-  // UPDATE
-  @Put('items/:id')
-  @ApiOperation({ summary: 'Update an existing item' })
-
-  @ApiParam({ name: 'id', type: Number, required: true })
-  @ApiBody({ type: UpdateItemDto })
-  @ApiResponse({ status: 200, description: 'Item updated successfully.' })
-  @ApiResponse({ status: 400, description: 'Validation error.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 404, description: 'Item not found.' })
-
-  updateItem(
-    @CurrentUser() _user: any,
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: UpdateItemDto,
-  ) {
-    return this.stock.updateItem(id, dto); // ✅ service expects (id, dto)
+  // --- PURCHASE: Handle Supplier Request and Create Stock (AUTH REQUIRED) ---
+  @Post('purchaseRequest')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('StockKeeper')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Handle supplier purchase request and create stock' })
+  @ApiBody({ type: CreateStockDto })
+  @ApiCreatedResponse({ description: 'Stock created and request updated.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async handlePurchaseRequest(@Body() dto: CreateStockDto) {
+    try {
+      return await this.stock.handlePurchaseRequest(dto);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to handle purchase request', err?.stack || err);
+      throw new InternalServerErrorException('Failed to handle purchase request');
+    }
   }
 
-  // LIST (with filters)
-  @Get('items')
-  @ApiOperation({ summary: 'List items with optional filters' })
-
-  @ApiQuery({ name: 'q', required: false, description: 'Free text search' })
-  @ApiQuery({ name: 'supplierId', required: false, type: Number })
-  @ApiQuery({ name: 'category', required: false, type: String })
-  @ApiQuery({ name: 'barcode', required: false, type: String })
-  @ApiResponse({ status: 200, description: 'Items fetched successfully.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-
-  listItems(
-    @CurrentUser() _user: any,
-    @Query('q') q?: string,
-    @Query('categoryId') categoryIdRaw?: string,
-    @Query('supplierId') supplierIdRaw?: string,
-    @Query('skip') skipRaw?: string,
-    @Query('take') takeRaw?: string,
-  ) {
-    const categoryId =
-      typeof categoryIdRaw === 'string' ? parseInt(categoryIdRaw, 10) : undefined;
-    const supplierId =
-      typeof supplierIdRaw === 'string' ? parseInt(supplierIdRaw, 10) : undefined;
-    const skip = typeof skipRaw === 'string' ? parseInt(skipRaw, 10) : undefined;
-    const take = typeof takeRaw === 'string' ? parseInt(takeRaw, 10) : undefined;
-
-    return this.stock.getItems({
-      q: q || undefined,
-      categoryId: Number.isFinite(categoryId as number) ? (categoryId as number) : undefined,
-      supplierId: Number.isFinite(supplierId as number) ? (supplierId as number) : undefined,
-      skip: Number.isFinite(skip as number) ? (skip as number) : undefined,
-      take: Number.isFinite(take as number) ? (take as number) : undefined,
-    }); // ✅ service method is getItems(params)
-  }
-
-  // GET BY ID
-  @Get('items/:id')
-
-  @ApiOperation({ summary: 'Get a single item by ID' })
-  @ApiParam({ name: 'id', type: Number, required: true })
-  @ApiResponse({ status: 200, description: 'Item fetched successfully.' })
-  @ApiResponse({ status: 401, description: 'Unauthorized.' })
-  @ApiResponse({ status: 403, description: 'Forbidden.' })
-  @ApiResponse({ status: 404, description: 'Item not found.' })
-  getItem(@CurrentUser() user: any, @Param('id', ParseIntPipe) id: number) {
-    return this.stock.getItem(user, id);
-
-  @ApiOperation({ summary: 'Get an item by ID' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Single item' })
-  getItem(@CurrentUser() _user: any, @Param('id', ParseIntPipe) id: number) {
-    return this.stock.getItemById(id); // ✅ service method is getItemById(id)
-  }
-
-  // DELETE
-  @Delete('items/:id')
-  @ApiOperation({ summary: 'Delete an item by ID' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Item deleted' })
-  deleteItem(@CurrentUser() _user: any, @Param('id', ParseIntPipe) id: number) {
-    return this.stock.deleteItem(id); // ✅ service method is deleteItem(id)
-
+  // --- CATEGORY: List (PUBLIC – NO AUTH) ---
+  @Get('categories')
+  @ApiOperation({ summary: 'List all categories (public)' })
+  @ApiOkResponse({
+    description: 'Categories fetched.',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'number', example: 1 },
+          category: { type: 'string', example: 'Electronics' },
+          colorCode: { type: 'string', example: '#FF5733' },
+        },
+      },
+    },
+  })
+  async listCategories() {
+    // No guards: accessible without JWT for testing
+    return this.stock.listCategories();
   }
 }

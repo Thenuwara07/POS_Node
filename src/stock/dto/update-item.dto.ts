@@ -58,6 +58,8 @@ export class UpdateItemDto {
   @IsOptional()
   lowStockWarn?: boolean;
 
+  
+
   @IsString()
   @IsOptional()
   gradient?: string | null;

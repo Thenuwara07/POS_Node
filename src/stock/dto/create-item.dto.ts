@@ -1,12 +1,10 @@
 import {
-  IsBoolean,
-  IsIn,
   IsInt,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   Min,
+  IsHexColor,
 } from 'class-validator';
 
 export class CreateItemDto {
@@ -18,51 +16,28 @@ export class CreateItemDto {
   @IsNotEmpty()
   barcode!: string;
 
-  @IsString()
-  @IsNotEmpty()
-  unit!: string;
-
   @IsInt()
+  @Min(1)
   categoryId!: number;
 
   @IsInt()
+  @Min(1)
   supplierId!: number;
-
-  @IsString()
-  @IsOptional()
-  @IsIn(['Active', 'Inactive'])
-  status?: string;
-
-  @IsNumber()
-  @Min(0)
-  cost!: number;
-
-  @IsNumber()
-  @Min(0)
-  markup!: number;
-
-  @IsNumber()
-  @Min(0)
-  salePrice!: number;
 
   @IsInt()
   @IsOptional()
   @Min(0)
-  reorderLevel?: number;
-
-  @IsBoolean()
-  @IsOptional()
-  lowStockWarn?: boolean;
+  reorderLevel?: number; // defaults to 0 in DB if omitted
 
   @IsString()
   @IsOptional()
-  gradient?: string | null;
+  gradient?: string | null; // HEX string or JSON per your comment
 
   @IsString()
   @IsOptional()
   remark?: string | null;
 
-  @IsString()
+  @IsHexColor()
   @IsOptional()
-  colorCode?: string;
+  colorCode?: string; // defaults to "#000000" in DB if omitted
 }

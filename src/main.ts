@@ -11,18 +11,35 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
 
-    app.enableCors({
-    origin: false, // Your Flutter web port
-    credentials: true, // Required for cookies
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Requested-With',
-      'Accept',
-      'origin'
-    ]
-  });
+
+app.enableCors({
+  origin: (origin, callback) => {
+    // Allow Postman & mobile apps (no origin header)
+    if (!origin) return callback(null, true);
+
+    // Allow localhost dev (any port) and LAN IPs
+    const ok =
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+      /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin);
+
+    if (ok) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'), false);
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+  ],
+  credentials: false, // keep false since you’re returning JWTs in JSON (not cookies)
+});
+
+
 
    // 🔥 Swagger setup
   const config = new DocumentBuilder()
@@ -38,9 +55,11 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-
-  await app.listen(process.env.PORT ?? 3001);
-  console.log(`Server is running on port ${process.env.PORT ?? 3001}`);
+  if (await app.listen(process.env.PORT ?? 3001)) {
+    console.log(`Server is running on port ${process.env.PORT ?? 3001}`);
+  } else {
+    console.error('Failed to start server');
+  }
 
 }
 bootstrap();
