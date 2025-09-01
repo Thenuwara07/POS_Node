@@ -15,10 +15,10 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 
-@ApiTags('insight')
-@ApiBearerAuth('JWT-auth')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('StockKeeper') // Adjust the roles as necessary
+// @ApiTags('insight')
+// @ApiBearerAuth('JWT-auth')
+// @UseGuards(AuthGuard('jwt'), RolesGuard)
+// @Roles('StockKeeper') // Adjust the roles as necessary
 @Controller('insight')
 export class InsightController {
   constructor(private readonly insightService: InsightService) {}

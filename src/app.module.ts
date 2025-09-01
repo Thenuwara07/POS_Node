@@ -15,6 +15,7 @@ import { SupplierModule } from './supplier/supplier.module';
 import { InsightModule } from './insight/insight.module';
 
 import { InventoryModule } from './inventory/inventory.module';
+import { CreditorsModule } from './creditors/creditors.module';
 
 @Module({
   imports: [
@@ -27,6 +28,8 @@ import { InventoryModule } from './inventory/inventory.module';
     StockModule,
    
     InventoryModule,
+   
+    CreditorsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

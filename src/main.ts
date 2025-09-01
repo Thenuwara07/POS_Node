@@ -11,6 +11,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
 
+
 app.enableCors({
   origin: (origin, callback) => {
     // Allow Postman & mobile apps (no origin header)
@@ -37,6 +38,7 @@ app.enableCors({
   ],
   credentials: false, // keep false since you’re returning JWTs in JSON (not cookies)
 });
+
 
 
    // 🔥 Swagger setup
