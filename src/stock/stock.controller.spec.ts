@@ -3,7 +3,7 @@ import { StockController } from './stock.controller';
 import { StockService } from './stock.service';
 import { InternalServerErrorException } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
-import { CreateItemDto } from './dto/create-item.dto';
+import { CreateItemDto } from './dto/create-item-with-stock.dto';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 
@@ -39,7 +39,10 @@ describe('StockController', () => {
 
   describe('createCategory', () => {
     it('should successfully create a category', async () => {
-      const dto: CreateCategoryDto = { category: 'Electronics', colorCode: '#FF5733' };
+      const dto: CreateCategoryDto = {
+        category: 'Electronics',
+        colorCode: '#FF5733',
+      };
       mockStockService.createCategory.mockResolvedValue(dto);
 
       expect(await controller.createCategory(dto)).toEqual(dto);
@@ -47,10 +50,15 @@ describe('StockController', () => {
     });
 
     it('should throw an error if category creation fails', async () => {
-      const dto: CreateCategoryDto = { category: 'Electronics', colorCode: '#FF5733' };
+      const dto: CreateCategoryDto = {
+        category: 'Electronics',
+        colorCode: '#FF5733',
+      };
       mockStockService.createCategory.mockRejectedValue(new Error('Error'));
 
-      await expect(controller.createCategory(dto)).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.createCategory(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 
@@ -77,7 +85,9 @@ describe('StockController', () => {
       };
       mockStockService.createItem.mockRejectedValue(new Error('Error'));
 
-      await expect(controller.createItem(dto)).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.createItem(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 
@@ -104,10 +114,13 @@ describe('StockController', () => {
         sellPrice: 15.0,
         supplierId: 1,
       };
-      mockStockService.handlePurchaseRequest.mockRejectedValue(new Error('Error'));
+      mockStockService.handlePurchaseRequest.mockRejectedValue(
+        new Error('Error'),
+      );
 
-      await expect(controller.handlePurchaseRequest(dto)).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.handlePurchaseRequest(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
-
 });
