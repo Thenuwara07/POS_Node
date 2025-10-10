@@ -1,3 +1,61 @@
+// // src/suppliers/dto/create-supplier.dto.ts
+// import {
+//   IsString,
+//   IsNotEmpty,
+//   IsOptional,
+//   IsEnum,
+//   IsEmail,
+//   IsBoolean,
+//   IsHexColor,
+//   IsArray,
+//   IsInt,
+// } from 'class-validator';
+// import { SupplierStatus } from '../../../generated/prisma'; // ✅ enums come from @prisma/client
+
+// // src/suppliers/dto/create-supplier.dto.ts
+// export class CreateSupplierDto {
+//   @IsString()
+//   @IsNotEmpty()
+//   name!: string;
+
+//   @IsString()
+//   @IsNotEmpty()
+//   contact!: string;
+
+//   @IsString()
+//   @IsNotEmpty()
+//   brand!: string;
+
+//   @IsEmail()
+//   @IsOptional()
+//   email?: string;
+
+//   @IsString()
+//   @IsOptional()
+//   address?: string;
+
+//   @IsString()
+//   @IsNotEmpty()
+//   location!: string;
+
+//   @IsEnum(SupplierStatus)
+//   @IsOptional()
+//   status?: SupplierStatus;
+
+//   @IsBoolean()
+//   @IsOptional()
+//   preferred?: boolean; // Use boolean, Prisma will convert to number
+
+//   @IsString()
+//   @IsOptional()
+//   paymentTerms?: string;
+
+//   @IsString()
+//   @IsOptional()
+//   notes?: string;
+// }
+
+
 // src/suppliers/dto/create-supplier.dto.ts
 import {
   IsString,
@@ -5,13 +63,11 @@ import {
   IsOptional,
   IsEnum,
   IsEmail,
-  IsBoolean,
-  IsHexColor,
-  IsArray,
   IsInt,
+  Min,
+  Max,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { SupplierStatus } from '../../../generated/prisma'; // ✅ enums come from @prisma/client
+import { SupplierStatus } from '../../../generated/prisma'; // ✅ Import from @prisma/client
 
 export class CreateSupplierDto {
   @IsString()
@@ -34,11 +90,6 @@ export class CreateSupplierDto {
   @IsOptional()
   address?: string;
 
-  // Optional in DTO because DB has a default "#000000"
-  @IsHexColor()
-  @IsOptional()
-  colorCode?: string;
-
   @IsString()
   @IsNotEmpty()
   location!: string;
@@ -47,9 +98,11 @@ export class CreateSupplierDto {
   @IsOptional()
   status?: SupplierStatus;
 
-  @IsBoolean()
+  @IsInt()
+  @Min(0)
+  @Max(1)
   @IsOptional()
-  preferred?: boolean; // DB defaults to false if omitted
+  preferred?: number; // Change from boolean to number
 
   @IsString()
   @IsOptional()
@@ -59,13 +112,11 @@ export class CreateSupplierDto {
   @IsOptional()
   notes?: string;
 
-  /**
-   * Optional: if you want to connect existing Location records.
-   * Not part of the Prisma model fields directly, but useful for API shape.
-   */
-  @IsArray()
-  @IsInt({ each: true })
-  @Type(() => Number)
+  @IsString()
   @IsOptional()
-  locationIds?: number[];
+  colorCode?: string;
+
+  // Remove these as Prisma handles them automatically
+  // createdAt?: Date;
+  // updatedAt?: Date;
 }
