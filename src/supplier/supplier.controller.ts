@@ -17,7 +17,7 @@ import {
 @ApiTags('supplier')
 @ApiBearerAuth('JWT-auth')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('StockKeeper')
+@Roles('Stockkeeper')
 @Controller('supplier')
 export class SupplierController {
   constructor(private readonly supplierService: SupplierService) {}
