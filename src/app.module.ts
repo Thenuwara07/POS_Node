@@ -14,7 +14,7 @@ import { UsersModule } from './users/users.module';
 import { SupplierModule } from './supplier/supplier.module';
 // import { InsightModule } from './insight/insight.module';
 
-import { InventoryModule } from './inventory/inventory.module';
+// import { InventoryModule } from './inventory/inventory.module';
 import { CreditorsModule } from './creditors/creditors.module';
 
 @Module({
@@ -27,7 +27,7 @@ import { CreditorsModule } from './creditors/creditors.module';
     // InsightModule,
     StockModule,
    
-    InventoryModule,
+    // InventoryModule,
    
     CreditorsModule,
   ],

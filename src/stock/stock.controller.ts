@@ -53,7 +53,7 @@ export class StockController {
   // --- CATEGORY: Create (AUTH REQUIRED) ---
   @Post('categories')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('StockKeeper')
+  @Roles('Stockkeeper')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new category' })
   @ApiBody({ type: CreateCategoryDto })
@@ -76,7 +76,7 @@ export class StockController {
   // --- ITEM: Create (AUTH REQUIRED) ---
   @Post('items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('StockKeeper')
+  @Roles('Stockkeeper')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new item (with optional initial stock & image)' })
   @ApiConsumes('multipart/form-data')
@@ -124,7 +124,7 @@ export class StockController {
   // --- PURCHASE: Create Stock (AUTH REQUIRED) ---
   @Post('purchase')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('StockKeeper')
+  @Roles('Stockkeeper')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create stock for existing item' })
   @ApiBody({ type: CreateStockDto })
