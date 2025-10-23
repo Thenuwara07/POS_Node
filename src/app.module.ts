@@ -16,6 +16,7 @@ import { SupplierModule } from './supplier/supplier.module';
 
 // import { InventoryModule } from './inventory/inventory.module';
 import { CreditorsModule } from './creditors/creditors.module';
+import { ManagerModule } from './manager/manager.module';
 
 @Module({
   imports: [
@@ -30,6 +31,8 @@ import { CreditorsModule } from './creditors/creditors.module';
     // InventoryModule,
    
     CreditorsModule,
+   
+    ManagerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
