@@ -7,12 +7,12 @@ import { UpdateManagerDto } from './dto/update-manager.dto';
 export class ManagerController {
   constructor(private readonly managerService: ManagerService) {}
 
-  @Post()
+  @Post('add-manager')
   create(@Body() dto: CreateManagerDto) {
     return this.managerService.create(dto);
   }
 
-  @Get()
+  @Get('get-managers')
   findAll(
     @Query('search') search?: string,
     @Query('role') role?: string,
@@ -22,17 +22,17 @@ export class ManagerController {
     return this.managerService.findAll(search, role, limit, offset);
   }
 
-  @Get(':id')
+  @Get('get-manager/:id')
   findOne(@Param('id') id: string) {
     return this.managerService.findOne(Number(id));
   }
 
-  @Patch(':id')
+  @Patch('update-manager/:id')
   update(@Param('id') id: string, @Body() dto: UpdateManagerDto) {
     return this.managerService.update(Number(id), dto);
   }
 
-  @Delete(':id')
+  @Delete('delete-manager/:id')
   remove(@Param('id') id: string) {
     return this.managerService.remove(Number(id));
   }
