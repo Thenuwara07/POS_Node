@@ -123,4 +123,29 @@ async getTrendingItems(limit = 5, days = 7) {
   }));
 }
 
+  // 🔹 Get audit logs
+  async getAuditLogs(
+    userId?: number,
+    reportCode?: string,
+    limit = 20,
+    offset = 0,
+  ) {
+    const where: any = {};
+
+    if (userId) where.userId = Number(userId);
+    if (reportCode) where.reportCode = reportCode;
+
+    const logs = await this.prisma.reportAudit.findMany({
+      where,
+      orderBy: { viewedAt: 'desc' },
+      take: limit,
+      skip: offset,
+      include: {
+        user: { select: { id: true, name: true, email: true, role: true } },
+      },
+    });
+
+    return logs;
+  }
+  
 }

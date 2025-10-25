@@ -45,4 +45,15 @@ export class ManagerController {
     return this.managerService.getTrendingItems(limit, days);
   }
 
+    // 🔹 View audit logs
+  @Get('audit-logs')
+  getAuditLogs(
+    @Query('userId') userId?: number,
+    @Query('reportCode') reportCode?: string,
+    @Query('limit') limit?: number,
+    @Query('offset') offset?: number,
+  ) {
+    return this.managerService.getAuditLogs(userId, reportCode, limit, offset);
+  }
+
 }
