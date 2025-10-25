@@ -36,4 +36,13 @@ export class ManagerController {
   remove(@Param('id') id: string) {
     return this.managerService.remove(Number(id));
   }
+
+    @Get('trending-items')
+  async getTrendingItems(
+    @Query('limit') limit: number = 5,
+    @Query('days') days: number = 7,
+  ) {
+    return this.managerService.getTrendingItems(limit, days);
+  }
+
 }

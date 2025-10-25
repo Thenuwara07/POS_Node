@@ -103,4 +103,24 @@ export class ManagerService {
     const candidateHash = await hash(password, 10);
     return user.password === candidateHash ? user : null;
   }
+
+// ✅ Get trending items (based on reportAudit table)
+async getTrendingItems(limit = 5, days = 7) {
+  const fromTimestamp = Date.now() - days * 24 * 60 * 60 * 1000;
+
+  const trending = await this.prisma.reportAudit.groupBy({
+    by: ['reportCode'], // ✅ camelCase
+    where: { viewedAt: { gte: fromTimestamp } }, // ✅ camelCase
+    _count: { reportCode: true }, // ✅ camelCase
+    orderBy: { _count: { reportCode: 'desc' } }, // ✅ camelCase
+    take: limit,
+  });
+
+  // ✅ Format response
+  return trending.map((item) => ({
+    reportCode: item.reportCode,
+    views: item._count?.reportCode ?? 0,
+  }));
+}
+
 }
