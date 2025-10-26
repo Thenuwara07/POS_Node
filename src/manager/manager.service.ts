@@ -116,7 +116,7 @@ async getTrendingItems(limit = 5, days = 7) {
     take: limit,
   });
 
-  // ✅ Format response
+
   return trending.map((item) => ({
     reportCode: item.reportCode,
     views: item._count?.reportCode ?? 0,
