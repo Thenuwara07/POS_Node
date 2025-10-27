@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('Admin', 'Manager', 'Cashier', 'StockKeeper');
+CREATE TYPE "Role" AS ENUM ('ADMIN', 'MANAGER', 'CASHIER', 'STOCKKEEPER');
 
 -- CreateEnum
 CREATE TYPE "SupplierStatus" AS ENUM ('ACTIVE', 'INACTIVE', 'PENDING');
@@ -20,7 +20,7 @@ CREATE TABLE "user" (
     "email" TEXT NOT NULL,
     "contact" TEXT NOT NULL,
     "password" TEXT NOT NULL,
-    "role" "Role" NOT NULL DEFAULT 'Cashier',
+    "role" "Role" NOT NULL,
     "color_code" TEXT NOT NULL DEFAULT '#000000',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,

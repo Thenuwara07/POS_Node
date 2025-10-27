@@ -25,7 +25,7 @@ export class ManagerService {
         email: dto.email.toLowerCase(),
         contact: dto.contact,
         password: hashedPassword,
-        role: (dto.role as Role) || Role.Manager,
+        role: (dto.role as Role) || Role.MANAGER,
         colorCode: dto.colorCode || '#000000',
         createdAt: now,
         updatedAt: now,
@@ -81,7 +81,7 @@ export class ManagerService {
         email: dto.email?.toLowerCase() ?? existing.email,
         contact: dto.contact ?? existing.contact,
         password: dto.password ? await hash(dto.password, 10) : existing.password, // ✅ fixed field name
-        role: (dto.role as Role) || Role.Manager,
+        role: (dto.role as Role) || Role.MANAGER,
         colorCode: dto.colorCode ?? existing.colorCode,
         updatedAt: new Date(),
       },

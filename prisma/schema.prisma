@@ -11,10 +11,10 @@ datasource db {
 
 // =================== ENUMS ===================
 enum Role {
-  Admin
-  Manager
-  Cashier
-  Stockkeeper
+  ADMIN
+  MANAGER
+  CASHIER
+  STOCKKEEPER
 }
 
 enum SupplierStatus {
@@ -48,7 +48,7 @@ model User {
   email            String  @unique
   contact          String
   password         String
-  role             Role    @default(Cashier)
+  role             Role
   colorCode        String  @default("#000000") @map("color_code")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
