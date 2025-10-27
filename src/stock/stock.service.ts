@@ -1,4 +1,3 @@
-// src/stock/stock.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -20,13 +19,34 @@ export class StockService {
     private readonly imageStorage: ImageStorageService,
   ) {}
 
-  // ---- CATEGORY: Create ----
-  async createCategory(dto: CreateCategoryDto) {
+  // ---- CATEGORY: Create (with optional image) ----
+  async createCategory(
+    dto: CreateCategoryDto,
+    file?: Express.Multer.File,
+    userId?: number,
+  ) {
+    // resolve image path
+    let imagePath: string | undefined;
+
+    if (file) {
+      const absPath = file.path.replace(/\\/g, '/');
+      const idx = absPath.indexOf('/uploads/');
+      imagePath = idx >= 0 ? absPath.slice(idx + 1) : absPath; // make it relative (uploads/..)
+    } else if (dto.imageBase64) {
+      imagePath = this.imageStorage.saveBase64CategoryImage(dto.imageBase64);
+    }
+
     try {
+      const color = dto.colorCode.startsWith('#')
+        ? dto.colorCode.toUpperCase()
+        : ('#' + dto.colorCode).toUpperCase();
+
       return await this.prisma.category.create({
         data: {
           category: dto.category,
-          colorCode: dto.colorCode,
+          colorCode: color,
+          categoryImage: imagePath ?? null,
+          createdById: userId ?? null,
         },
       });
     } catch (err) {
@@ -45,12 +65,10 @@ export class StockService {
     // Handle image (file OR base64)
     let imagePath: string | undefined;
     if (file) {
-      // File uploaded via multer - build relative path
       const absPath = file.path.replace(/\\/g, '/');
       const uploadsIndex = absPath.indexOf('/uploads/');
       imagePath = uploadsIndex >= 0 ? absPath.slice(uploadsIndex + 1) : absPath;
     } else if (dto.imageBase64) {
-      // Base64 image
       imagePath = this.imageStorage.saveBase64ItemImage(dto.imageBase64);
     }
 
@@ -67,7 +85,6 @@ export class StockService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
-        // 1) Create item - use the correct field names that match Prisma schema
         const item = await tx.item.create({
           data: {
             name: dto.name,
@@ -78,12 +95,11 @@ export class StockService {
             gradient: dto.gradient,
             remark: dto.remark,
             colorCode: dto.colorCode ?? '#000000',
-            imagePath: imagePath, // This should match your Prisma schema
-            createdById: 1, // TODO: Get from authenticated user
+            imagePath: imagePath ?? null,
+            createdById: 1, // TODO: replace with JWT user id if needed
           },
         });
 
-        // 2) Optionally create stock - fix the type issue
         let createdStock: any = null;
         if (
           shouldCreateStock &&
@@ -94,7 +110,7 @@ export class StockService {
         ) {
           createdStock = await tx.stock.create({
             data: {
-              batchId: batchId,
+              batchId,
               itemId: item.id,
               quantity: dto.quantity,
               unitPrice: dto.unitPrice,
@@ -105,10 +121,7 @@ export class StockService {
           });
         }
 
-        return {
-          item,
-          stock: createdStock,
-        };
+        return { item, stock: createdStock };
       });
     } catch (err) {
       this.handlePrismaError(err, 'createItemWithOptionalStock');
@@ -117,19 +130,15 @@ export class StockService {
 
   // ---- PURCHASE: Handle Supplier Request and Create Stock ----
   async handlePurchaseRequest(dto: CreateStockDto) {
-    // Check if supplier exists
     await this.ensureSupplierExists(dto.supplierId);
-
-    // Check if item exists
     await this.ensureItemExists(dto.itemId);
 
-    // Generate batch ID
     const batchId = `${dto.itemId}-${Date.now()}`;
 
     try {
       return await this.prisma.stock.create({
         data: {
-          batchId: batchId,
+          batchId,
           itemId: dto.itemId,
           quantity: dto.quantity,
           unitPrice: dto.unitPrice,
@@ -148,27 +157,21 @@ export class StockService {
     const exists = await this.prisma.category.findUnique({
       where: { id: categoryId },
     });
-    if (!exists) {
+    if (!exists)
       throw new BadRequestException(`Category ${categoryId} does not exist`);
-    }
   }
 
   private async ensureSupplierExists(supplierId: number) {
     const exists = await this.prisma.supplier.findUnique({
       where: { id: supplierId },
     });
-    if (!exists) {
+    if (!exists)
       throw new BadRequestException(`Supplier ${supplierId} does not exist`);
-    }
   }
 
   private async ensureItemExists(itemId: number) {
-    const exists = await this.prisma.item.findUnique({
-      where: { id: itemId },
-    });
-    if (!exists) {
-      throw new BadRequestException(`Item ${itemId} does not exist`);
-    }
+    const exists = await this.prisma.item.findUnique({ where: { id: itemId } });
+    if (!exists) throw new BadRequestException(`Item ${itemId} does not exist`);
   }
 
   /**
@@ -176,26 +179,19 @@ export class StockService {
    */
   private handlePrismaError(err: unknown, ctx: string): never {
     if (err instanceof PrismaClientKnownRequestError) {
-      // Unique constraint violation
       if (err.code === 'P2002') {
         const target = Array.isArray(err.meta?.target)
           ? (err.meta!.target as string[]).join(', ')
           : ((err.meta?.target as string) ?? 'unique field');
         throw new ConflictException(`Duplicate value for ${target}`);
       }
-
-      // Foreign key constraint failure
       if (err.code === 'P2003') {
         throw new BadRequestException(`Invalid relation provided (${ctx}).`);
       }
-
-      // Record not found
       if (err.code === 'P2025') {
         throw new NotFoundException(`Requested resource not found (${ctx}).`);
       }
     }
-
-    // Fallback: hide internal details
     throw new InternalServerErrorException('Unexpected error occurred');
   }
 
