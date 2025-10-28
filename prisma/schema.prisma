@@ -95,10 +95,10 @@ model Supplier {
   address      String?
   brand        String
   colorCode    String         @default("#000000") @map("color_code")
-  location     String
+  location     String?
   status       SupplierStatus @default(ACTIVE)
   preferred    Int            @default(0)
-  paymentTerms String?        @map("payment_terms")
+  
   notes        String?
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")

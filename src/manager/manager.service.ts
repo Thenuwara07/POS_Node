@@ -50,7 +50,7 @@ export class ManagerService {
           email: dto.email.toLowerCase(),
           contact: dto.contact,
           password: hashedPassword,
-          role: (dto.role as Role) || Role.Manager,
+          role: (dto.role as Role) || Role.MANAGER,
           colorCode: dto.colorCode || '#000000',
           createdAt: now,
           updatedAt: now,

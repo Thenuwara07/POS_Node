@@ -19,6 +19,9 @@ export class StockService {
     private readonly imageStorage: ImageStorageService,
   ) {}
 
+// ------------------------------------------------------------------------------------------------
+
+
   // ---- CATEGORY: Create (with optional image) ----
   async createCategory(
     dto: CreateCategoryDto,
@@ -53,6 +56,11 @@ export class StockService {
       this.handlePrismaError(err, 'createCategory');
     }
   }
+
+
+
+
+  // ----------------------------------------------------------------------------------------
 
   // ---- ITEM: Create with optional stock ----
   async createItemWithOptionalStock(
@@ -128,6 +136,11 @@ export class StockService {
     }
   }
 
+
+
+
+  // ---------------------------------------------------------------------------------------------------
+
   // ---- PURCHASE: Handle Supplier Request and Create Stock ----
   async handlePurchaseRequest(dto: CreateStockDto) {
     await this.ensureSupplierExists(dto.supplierId);
@@ -152,6 +165,11 @@ export class StockService {
     }
   }
 
+
+  
+
+  // ---------------------------------------------------------------------------------------------------------------
+  
   // ---- Helpers ----
   private async ensureCategoryExists(categoryId: number) {
     const exists = await this.prisma.category.findUnique({
@@ -195,10 +213,16 @@ export class StockService {
     throw new InternalServerErrorException('Unexpected error occurred');
   }
 
-  // GET all categories (alphabetical)
+
+
+// --------------------------------------------------------------------------------------------------------
+ 
+
+// GET all categories (alphabetical)
   async listCategories() {
     return this.prisma.category.findMany({
       orderBy: { category: 'asc' },
     });
   }
+
 }
