@@ -49,7 +49,7 @@ export class ManagerController {
   // --- CREATE MANAGER ---
   @Post('add-manager')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Manager')
+  @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new manager' })
   @ApiCreatedResponse({ description: 'Manager created.' })
@@ -70,7 +70,7 @@ export class ManagerController {
   // --- GET ALL MANAGERS ---
   @Get('get-managers')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin', 'Manager')
+  @Roles( 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get all managers' })
   @ApiOkResponse({ description: 'Managers fetched.' })
@@ -91,7 +91,7 @@ export class ManagerController {
   // --- GET ONE MANAGER ---
   @Get('get-manager/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Manager')
+  @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get a single manager by ID' })
   async findOne(@Param('id') id: string) {
@@ -106,7 +106,7 @@ export class ManagerController {
   // --- UPDATE MANAGER ---
   @Patch('update-manager/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin')
+  @Roles('ADMIN')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update manager details' })
   async update(@Param('id') id: string, @Body() dto: UpdateManagerDto) {
@@ -121,7 +121,7 @@ export class ManagerController {
   // --- DELETE MANAGER ---
   @Delete('delete-manager/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin')
+  @Roles('ADMIN')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete manager by ID' })
   async remove(@Param('id') id: string) {
@@ -136,7 +136,7 @@ export class ManagerController {
   // --- TRENDING ITEMS ---
   @Get('trending-items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin', 'Manager')
+  @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get trending items based on report audit' })
   async getTrendingItems(
@@ -154,7 +154,7 @@ export class ManagerController {
   // --- AUDIT LOGS ---
   @Get('audit-logs')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Admin', 'Manager')
+  @Roles( 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'View audit logs' })
   async getAuditLogs(
