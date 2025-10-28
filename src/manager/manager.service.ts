@@ -62,6 +62,7 @@ export class ManagerService {
     } catch (err) {
       this.handlePrismaError(err, 'createManager');
     }
+
   }
 
   // ✅ Get all managers

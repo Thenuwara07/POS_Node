@@ -1,4 +1,3 @@
-// src/stock/stock.controller.ts
 import {
   Body,
   Controller,
@@ -11,6 +10,7 @@ import {
   UseInterceptors,
   UsePipes,
   ValidationPipe,
+  Req,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -35,6 +35,8 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateItemWithStockDto } from './dto/create-item-with-stock.dto';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { itemImageMulterOptions } from '../common/upload/multer.options';
+import { categoryImageMulterOptions } from '../common/upload/multer.category.options';
+import type { Request } from 'express';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -50,22 +52,46 @@ export class StockController {
 
   constructor(private readonly stockService: StockService) {}
 
-  // --- CATEGORY: Create (AUTH REQUIRED) ---
+  // -------------------------------------------------------------------------------------------------
+
+  // --- CATEGORY: Create with image (file OR base64) ---
   @Post('categories')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Stockkeeper')
+  @Roles('STOCKKEEPER')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create a new category' })
-  @ApiBody({ type: CreateCategoryDto })
+  @ApiOperation({ summary: 'Create a new category (supports image upload or base64)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(FileInterceptor('image', categoryImageMulterOptions()))
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', example: 'Electronics' },
+        colorCode: { type: 'string', example: '#FF0000' },
+        image: { type: 'string', format: 'binary' },
+        imageBase64: { type: 'string', example: 'data:image/png;base64,iVBOR...' },
+      },
+      required: ['category', 'colorCode'],
+    },
+  })
   @ApiCreatedResponse({ description: 'Category created.' })
   @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
   @ApiConflictResponse({ description: 'Duplicate category name.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
-  async createCategory(@Body() dto: CreateCategoryDto) {
+  async createCategory(
+    @Body() dto: CreateCategoryDto,
+    @UploadedFile() file?: Express.Multer.File,
+    @Req() req?: Request,
+  ) {
     try {
-      return await this.stockService.createCategory(dto);
+      const userId =
+        (req?.user as any)?.userId ||
+        (req?.user as any)?.sub ||
+        undefined; // Adjust per your JWT payload
+
+      return await this.stockService.createCategory(dto, file, userId);
     } catch (err: any) {
       if (err?.status && err?.response) throw err;
       this.logger.error('Failed to create category', err?.stack || err);
@@ -73,10 +99,14 @@ export class StockController {
     }
   }
 
-  // --- ITEM: Create (AUTH REQUIRED) ---
+
+// --------------------------------------------------------------------------------------------------------------------
+
+
+  // --- ITEM: Create (with optional image) ---
   @Post('items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Stockkeeper')
+  @Roles('STOCKKEEPER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new item (with optional initial stock & image)' })
   @ApiConsumes('multipart/form-data')
@@ -99,7 +129,7 @@ export class StockController {
         unitPrice: { type: 'number', example: 450.0 },
         sellPrice: { type: 'number', example: 650.0 },
       },
-      required: ['name', 'barcode', 'categoryId', 'supplierId'],
+      required: ['name',  'categoryId', 'supplierId'],
     },
   })
   @ApiCreatedResponse({ description: 'Item created (+ stock if provided).' })
@@ -121,13 +151,17 @@ export class StockController {
     }
   }
 
-  // --- PURCHASE: Create Stock (AUTH REQUIRED) ---
+
+
+// -------------------------------------------------------------------------------------------------------------
+
+
+  // --- PURCHASE: Create Stock ---
   @Post('purchase')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('Stockkeeper')
+  @Roles('STOCKKEEPER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create stock for existing item' })
-  @ApiBody({ type: CreateStockDto })
   @ApiCreatedResponse({ description: 'Stock created.' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
@@ -138,15 +172,26 @@ export class StockController {
       return await this.stockService.handlePurchaseRequest(dto);
     } catch (err: any) {
       if (err?.status && err?.response) throw err;
-      this.logger.error('Failed to create stock', err?.stack || err);
       throw new InternalServerErrorException('Failed to create stock');
     }
   }
 
+
+
+// ----------------------------------------------------------------------------------------------------------
+
+
   // --- CATEGORY: List (PUBLIC) ---
   @Get('categories')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'List all categories' })
+  @ApiUnauthorizedResponse({description:'Missing/Invalid JWT.'})
+  @ApiForbiddenResponse({description: 'Insufficient role permissions.'})
+  @ApiInternalServerErrorResponse({description: 'Unexpected server error.'})
   @ApiOkResponse({ description: 'Categories fetched.' })
+
   async listCategories() {
     return this.stockService.listCategories();
   }

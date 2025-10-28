@@ -132,16 +132,13 @@ async register(createUserDto: CreateUserDto) {
 
   const hashedPassword = await this.hashPassword(password);
 
-  // Normalize the role case to "Stockkeeper"
-  const normalizedRole = role ? role.charAt(0).toUpperCase() + role.slice(1).toLowerCase() : 'Stockkeeper';
-
   // Create the user data with proper role handling
   const userData: any = {
     email,
     contact,
     password: hashedPassword,
     name,
-    role: normalizedRole,
+    role,
   };
 
   const user = await this.prisma.user.create({
