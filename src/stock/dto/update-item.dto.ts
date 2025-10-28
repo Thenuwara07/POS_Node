@@ -29,11 +29,6 @@ export class UpdateItemDto {
   @IsOptional()
   supplierId?: number;
 
-  @IsString()
-  @IsOptional()
-  @IsIn(['Active', 'Inactive'])
-  status?: string;
-
   @IsNumber()
   @IsOptional()
   @Min(0)
@@ -71,4 +66,9 @@ export class UpdateItemDto {
   @IsString()
   @IsOptional()
   colorCode?: string;
+
+  @IsOptional()
+  @IsInt()
+  @IsIn([0, 1], { message: 'status must be 0 or 1' })
+  status?: number;
 }

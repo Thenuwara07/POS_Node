@@ -143,7 +143,7 @@ model Item {
   colorCode    String  @default("#000000") @map("color_code")
   imagePath    String? @map("image_path")
   createdById  Int?    @map("created_by")
-
+  status       Int      @default(1) @map("status")
   category             Category              @relation(fields: [categoryId], references: [id])
   supplier             Supplier              @relation(fields: [supplierId], references: [id])
   createdBy            User?                 @relation("item_created_by", fields: [createdById], references: [id])

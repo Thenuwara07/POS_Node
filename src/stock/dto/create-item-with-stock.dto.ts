@@ -18,23 +18,26 @@ export class CreateItemWithStockDto {
   @IsNotEmpty()
   name!: string;
 
-   @ApiPropertyOptional({ example: '8901234567890' })
+  @ApiPropertyOptional({ example: '8901234567890' })
   @IsString()
   @IsOptional()
   @Transform(({ value }) => (value === '' ? undefined : value))
   barcode?: string;
 
   @ApiProperty()
+  @Transform(({ value }) => parseInt(value, 10))
   @IsInt()
   @Min(1)
   categoryId!: number;
 
   @ApiProperty()
+  @Transform(({ value }) => parseInt(value, 10))
   @IsInt()
   @Min(1)
   supplierId!: number;
 
   @ApiPropertyOptional()
+  @Transform(({ value }) => (value === '' ? undefined : parseInt(value, 10)))
   @IsInt()
   @Min(0)
   @IsOptional()
@@ -64,18 +67,21 @@ export class CreateItemWithStockDto {
   imageBase64?: string;
 
   @ApiPropertyOptional()
+  @Transform(({ value }) => (value === '' ? undefined : parseInt(value, 10)))
   @IsInt()
   @IsPositive()
   @IsOptional()
   quantity?: number;
 
   @ApiPropertyOptional()
+  @Transform(({ value }) => (value === '' ? undefined : parseFloat(value)))
   @IsNumber()
   @IsPositive()
   @IsOptional()
   unitPrice?: number;
 
   @ApiPropertyOptional()
+  @Transform(({ value }) => (value === '' ? undefined : parseFloat(value)))
   @IsNumber()
   @IsPositive()
   @IsOptional()
