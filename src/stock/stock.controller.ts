@@ -52,6 +52,8 @@ export class StockController {
 
   constructor(private readonly stockService: StockService) {}
 
+  // -------------------------------------------------------------------------------------------------
+
   // --- CATEGORY: Create with image (file OR base64) ---
   @Post('categories')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -97,6 +99,10 @@ export class StockController {
     }
   }
 
+
+// --------------------------------------------------------------------------------------------------------------------
+
+
   // --- ITEM: Create (with optional image) ---
   @Post('items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -123,7 +129,7 @@ export class StockController {
         unitPrice: { type: 'number', example: 450.0 },
         sellPrice: { type: 'number', example: 650.0 },
       },
-      required: ['name', 'barcode', 'categoryId', 'supplierId'],
+      required: ['name',  'categoryId', 'supplierId'],
     },
   })
   @ApiCreatedResponse({ description: 'Item created (+ stock if provided).' })
@@ -145,6 +151,11 @@ export class StockController {
     }
   }
 
+
+
+// -------------------------------------------------------------------------------------------------------------
+
+
   // --- PURCHASE: Create Stock ---
   @Post('purchase')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -165,10 +176,22 @@ export class StockController {
     }
   }
 
+
+
+// ----------------------------------------------------------------------------------------------------------
+
+
   // --- CATEGORY: List (PUBLIC) ---
   @Get('categories')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'List all categories' })
+  @ApiUnauthorizedResponse({description:'Missing/Invalid JWT.'})
+  @ApiForbiddenResponse({description: 'Insufficient role permissions.'})
+  @ApiInternalServerErrorResponse({description: 'Unexpected server error.'})
   @ApiOkResponse({ description: 'Categories fetched.' })
+
   async listCategories() {
     return this.stockService.listCategories();
   }

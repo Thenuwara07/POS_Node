@@ -1,5 +1,6 @@
 // src/stock/dto/create-item-with-stock.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsInt,
   IsNotEmpty,
@@ -12,43 +13,44 @@ import {
 } from 'class-validator';
 
 export class CreateItemWithStockDto {
-  @ApiProperty({ example: 'Dell Mouse' })
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({ example: '8901234567890' })
+   @ApiPropertyOptional({ example: '8901234567890' })
   @IsString()
-  @IsNotEmpty()
-  barcode!: string;
+  @IsOptional()
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  barcode?: string;
 
-  @ApiProperty({ example: 1, description: 'Category ID' })
+  @ApiProperty()
   @IsInt()
   @Min(1)
   categoryId!: number;
 
-  @ApiProperty({ example: 3, description: 'Supplier ID' })
+  @ApiProperty()
   @IsInt()
   @Min(1)
   supplierId!: number;
 
-  @ApiPropertyOptional({ example: 5 })
+  @ApiPropertyOptional()
   @IsInt()
   @Min(0)
   @IsOptional()
   reorderLevel?: number;
 
-  @ApiPropertyOptional({ example: 'linear(#0ea5e9,#22d3ee)' })
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   gradient?: string;
 
-  @ApiPropertyOptional({ example: 'Wireless mouse' })
+  @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   remark?: string;
 
-  @ApiPropertyOptional({ example: '#000000' })
+  @ApiPropertyOptional()
   @IsHexColor()
   @IsOptional()
   colorCode?: string;
@@ -61,19 +63,19 @@ export class CreateItemWithStockDto {
   @IsOptional()
   imageBase64?: string;
 
-  @ApiPropertyOptional({ example: 100 })
+  @ApiPropertyOptional()
   @IsInt()
   @IsPositive()
   @IsOptional()
   quantity?: number;
 
-  @ApiPropertyOptional({ example: 450.0 })
+  @ApiPropertyOptional()
   @IsNumber()
   @IsPositive()
   @IsOptional()
   unitPrice?: number;
 
-  @ApiPropertyOptional({ example: 650.0 })
+  @ApiPropertyOptional()
   @IsNumber()
   @IsPositive()
   @IsOptional()

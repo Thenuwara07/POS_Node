@@ -134,7 +134,7 @@ model Category {
 model Item {
   id           Int     @id @default(autoincrement())
   name         String
-  barcode      String  @unique
+  barcode      String?  @unique
   categoryId   Int     @map("category_id")
   supplierId   Int     @map("supplier_id")
   reorderLevel Int     @default(0) @map("reorder_level")

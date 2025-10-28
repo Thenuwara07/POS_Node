@@ -88,12 +88,12 @@ export class StockService {
         const item = await tx.item.create({
           data: {
             name: dto.name,
-            barcode: dto.barcode,
+            barcode: dto.barcode ?? null,
             categoryId: dto.categoryId,
             supplierId: dto.supplierId,
             reorderLevel: dto.reorderLevel ?? 0,
-            gradient: dto.gradient,
-            remark: dto.remark,
+            gradient: dto.gradient ?? null,
+            remark: dto.remark ?? null,
             colorCode: dto.colorCode ?? '#000000',
             imagePath: imagePath ?? null,
             createdById: 1, // TODO: replace with JWT user id if needed
