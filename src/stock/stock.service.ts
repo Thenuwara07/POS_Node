@@ -11,8 +11,6 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { CreateItemWithStockDto } from './dto/create-item-with-stock.dto';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { ImageStorageService } from '../common/upload/image-storage.service';
-import { CreateSupplierDto } from './dto/create-supplier.dto';
-import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
 @Injectable()
 export class StockService {
@@ -168,109 +166,10 @@ export class StockService {
   }
 
 
-
-
-
-  // --------------------------------------------------------------------------------------------------------------
-
-
-
-  async createSupplier(dto: CreateSupplierDto, userId?: number) {
-    try {
-      const color = 
-      dto.colorCode
-      ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#{dto.colorCode}`).toUpperCase() 
-      : '#000000';
-
-      return await this.prisma.supplier.create({
-        data: {
-          name:dto.name,
-          brand: dto.brand,
-          contact: dto.contact,
-          email: dto.email ?? null,
-          location: dto.location ?? null,
-          notes: dto.notes ?? null,
-          colorCode: color,
-          createdById: userId ?? null,
-        },
-      });
-
-    } catch (err) {
-      this.handlePrismaError(err, 'createSupplier');
-    }
-  }
-
-
-
-  // -------------------------------------------------------------------------------------------------------------
-
-
-
-  async listSuppliers() {
-    return this.prisma.supplier.findMany({
-      orderBy: [{ name: 'asc'}, { brand: 'asc'}],
-    });
-  }
-
-// ---------------------------------------------------------------------------------------------------------------
-  
-
-  // Supplier : Get by ID
- 
-  async getSupplierById(id: number) {
-    const supplier = await this.prisma.supplier.findUnique({ where: {id} });
-    if (!supplier) throw new NotFoundException(`Supplier ${id} not found`);
-    return supplier;
-  }
-
-
-
-  // -------------------------------------------------------------------------------------------------------------
-
-
-
-  // === SUPPLIER: Update (optional) ===
-  async updateSupplier(id: number, dto: UpdateSupplierDto, userId?: number) {
-    // ensure exists
-    await this.getSupplierById(id);
-
-    const color =
-      dto.colorCode
-        ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#${dto.colorCode}`).toUpperCase()
-        : undefined;
-
-    try {
-      return await this.prisma.supplier.update({
-        where: { id },
-        data: {
-          name: dto.name,
-          brand: dto.brand,
-          contact: dto.contact,
-          email: dto.email,
-          location: dto.location,
-          notes: dto.notes,
-          colorCode: color,
-          updatedById: userId ?? null,
-        },
-      });
-    } catch (err) {
-      this.handlePrismaError(err, 'updateSupplier');
-    }
-  }
-
-  // === SUPPLIER: Delete (optional) ===
-  async deleteSupplier(id: number) {
-    try {
-      return await this.prisma.supplier.delete({ where: { id } });
-    } catch (err) {
-      this.handlePrismaError(err, 'deleteSupplier');
-    }
-  }
-
-
   
 
   // ---------------------------------------------------------------------------------------------------------------
+  
   // ---- Helpers ----
   private async ensureCategoryExists(categoryId: number) {
     const exists = await this.prisma.category.findUnique({
