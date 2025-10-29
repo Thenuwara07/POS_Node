@@ -60,43 +60,214 @@
 //   }
 // }
 
-import { Injectable } from '@nestjs/common';
+// src/cashier/cashier.controller.ts
+import {
+  Body,
+  Controller,
+  Get,
+  InternalServerErrorException,
+  Logger,
+  Post,
+  Put,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import {
+  ApiBearerAuth,
+  ApiBadRequestResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+  ApiInternalServerErrorResponse,
+  ApiBody,
+} from '@nestjs/swagger';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { CashierService } from './cashier.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateStockDto } from './dto/update-stock.dto';
 
-@Injectable()
-export class CashierService {
+@ApiTags('Cashier')
+@Controller('cashier')
+@UsePipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+)
+export class CashierController {
+  private readonly logger = new Logger(CashierController.name);
+
+  constructor(private readonly cashierService: CashierService) {}
+
+  // --- CATEGORIES WITH ITEMS: Get (AUTH REQUIRED) ---
+  @Get('categories-with-items')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Cashier')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get all categories with items and batches' })
+  @ApiOkResponse({ description: 'Categories with items fetched successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
   async getCategoriesWithItemsAndBatches() {
-    // Implement with Prisma or SQL joins
-    return []; // mock
+    try {
+      return await this.cashierService.getCategoriesWithItemsAndBatches();
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to fetch categories with items', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch categories with items');
+    }
   }
 
+  // --- PAYMENTS: Get All (AUTH REQUIRED) ---
+  @Get('payments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Cashier')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get all payments' })
+  @ApiOkResponse({ description: 'Payments fetched successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
   async getAllPayments() {
-    return []; // replace with prisma.payment.findMany()
+    try {
+      return await this.cashierService.getAllPayments();
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to fetch payments', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch payments');
+    }
   }
 
-  async insertPayment(dto: CreatePaymentDto) {
-    // Save into DB
-    return { message: 'Payment inserted successfully', dto };
+  // --- PAYMENT: Create (AUTH REQUIRED) ---
+  @Post('payments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Cashier')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Create a new payment' })
+  @ApiBody({ type: CreatePaymentDto })
+  @ApiCreatedResponse({ description: 'Payment created successfully.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async insertPayment(@Body() dto: CreatePaymentDto) {
+    try {
+      return await this.cashierService.insertPayment(dto);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to create payment', err?.stack || err);
+      throw new InternalServerErrorException('Failed to create payment');
+    }
   }
 
-  async insertInvoices(payload: { saleInvoiceId: string; invoices: CreateInvoiceDto[] }) {
-    // Batch insert logic
-    return { message: 'Invoices inserted successfully', payload };
+  // --- INVOICES: Create Batch (AUTH REQUIRED) ---
+  @Post('invoices')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Cashier')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Create multiple invoices for a sale' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        saleInvoiceId: { type: 'string', example: 'INV-2025-001' },
+        invoices: {
+          type: 'array',
+          items: { type: 'object' },
+        },
+      },
+      required: ['saleInvoiceId', 'invoices'],
+    },
+  })
+  @ApiCreatedResponse({ description: 'Invoices created successfully.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async insertInvoices(
+    @Body() payload: { saleInvoiceId: string; invoices: CreateInvoiceDto[] },
+  ) {
+    try {
+      return await this.cashierService.insertInvoices(payload);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to create invoices', err?.stack || err);
+      throw new InternalServerErrorException('Failed to create invoices');
+    }
   }
 
+  // --- RETURNS: Get All (AUTH REQUIRED) ---
+  @Get('returns')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Cashier')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get all returns' })
+  @ApiOkResponse({ description: 'Returns fetched successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
   async getAllReturns() {
-    return []; // return all return rows
+    try {
+      return await this.cashierService.getAllReturns();
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to fetch returns', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch returns');
+    }
   }
 
-  async insertReturn(dto: CreateReturnDto) {
-    return { message: 'Return added successfully', dto };
+  // --- RETURN: Create (AUTH REQUIRED) ---
+  @Post('returns')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Cashier')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Create a new return' })
+  @ApiBody({ type: CreateReturnDto })
+  @ApiCreatedResponse({ description: 'Return created successfully.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async insertReturn(@Body() dto: CreateReturnDto) {
+    try {
+      return await this.cashierService.insertReturn(dto);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to create return', err?.stack || err);
+      throw new InternalServerErrorException('Failed to create return');
+    }
   }
 
-  async updateStock(dto: UpdateStockDto) {
-    return { message: 'Stock updated', dto };
+  // --- STOCK: Update (AUTH REQUIRED) ---
+  @Put('stock')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('Cashier')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update stock quantity' })
+  @ApiBody({ type: UpdateStockDto })
+  @ApiOkResponse({ description: 'Stock updated successfully.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async updateStock(@Body() dto: UpdateStockDto) {
+    try {
+      return await this.cashierService.updateStock(dto);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to update stock', err?.stack || err);
+      throw new InternalServerErrorException('Failed to update stock');
+    }
   }
 }
 
