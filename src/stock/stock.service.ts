@@ -13,6 +13,7 @@ import { CreateItemWithStockDto } from './dto/create-item-with-stock.dto';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { ImageStorageService } from '../common/upload/image-storage.service';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
+import { UpdateItemDto } from './dto/update-item.dto';
 
 @Injectable()
 export class StockService {
@@ -353,7 +354,69 @@ export class StockService {
 
 
 
+  // ---- ITEM: Update ----
+async updateItem(
+  itemId: number,
+  dto: UpdateItemDto,
+  file?: Express.Multer.File,
+  userId?: number,
+) {
+  this.logger.log(`Updating item ID: ${itemId}`, {
+    userId,
+    hasFile: !!file,
+    hasBase64: !!dto.imageBase64,
+  });
 
+  try {
+    const existing = await this.prisma.item.findUnique({ where: { id: itemId } });
+    if (!existing) {
+      this.logger.warn(`Item not found: ${itemId}`);
+      throw new NotFoundException(`Item ID ${itemId} not found`);
+    }
+
+    // Validate foreign keys if provided
+    if (dto.categoryId) await this.ensureCategoryExists(dto.categoryId);
+    if (dto.supplierId) await this.ensureSupplierExists(dto.supplierId);
+
+    // Handle new image if uploaded or base64 provided
+    let imagePath = existing.imagePath;
+    if (file) {
+      const absPath = file.path.replace(/\\/g, '/');
+      const idx = absPath.indexOf('/uploads/');
+      imagePath = idx >= 0 ? absPath.slice(idx + 1) : absPath;
+      this.logger.log(`Updated image file path: ${imagePath}`);
+    } else if (dto.imageBase64) {
+      imagePath = this.imageStorage.saveBase64ItemImage(dto.imageBase64);
+      this.logger.log(`Updated base64 image path: ${imagePath}`);
+    }
+
+    const updatedItem = await this.prisma.item.update({
+      where: { id: itemId },
+      data: {
+        name: dto.name ?? existing.name,
+        barcode: dto.barcode ?? existing.barcode,
+        categoryId: dto.categoryId ?? existing.categoryId,
+        supplierId: dto.supplierId ?? existing.supplierId,
+        reorderLevel: dto.reorderLevel ?? existing.reorderLevel,
+        colorCode: dto.colorCode ?? existing.colorCode,
+        remark: dto.remark ?? existing.remark,
+        imagePath,
+        createdById: userId ?? existing.createdById,
+      },
+    });
+
+    this.logger.log(`Item updated successfully in DB: ${updatedItem.id}`);
+    return updatedItem;
+  } catch (err) {
+    this.logger.error(`Failed to update item: ${err.message}`, err.stack);
+    this.handlePrismaError(err, 'updateItem');
+  }
+}
+
+
+
+
+  // ---------------------------------------------------------------------------------------------
 
   async listItems(): Promise<GetAllItemsDto[]> {
     this.logger.log('Fetching all items with summaries');

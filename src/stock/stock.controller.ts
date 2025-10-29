@@ -11,6 +11,8 @@ import {
   UsePipes,
   ValidationPipe,
   Req,
+  Param,
+  Patch,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -38,6 +40,7 @@ import { itemImageMulterOptions } from '../common/upload/multer.options';
 import { categoryImageMulterOptions } from '../common/upload/multer.category.options';
 import type { Request } from 'express';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
+import { UpdateItemDto } from './dto/update-item.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -290,6 +293,50 @@ export class StockController {
       throw new InternalServerErrorException('Failed to fetch item summaries');
     }
   }
+
+
+
+  // ---------------------------------------------------------------------------------------------
+
+
+
+  // --- ITEM: Update ---
+@Patch('items/:id')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiConsumes('multipart/form-data')
+@UseInterceptors(FileInterceptor('image', itemImageMulterOptions()))
+@ApiOperation({ summary: 'Update an existing item (supports image upload or base64)' })
+@ApiOkResponse({ description: 'Item updated successfully.' })
+@ApiBadRequestResponse({ description: 'Validation failed or item not found.' })
+@ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+@ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+@ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+async updateItem(
+  @Param('id') id: number,
+  @Body() dto: UpdateItemDto,
+  @UploadedFile() file?: Express.Multer.File,
+  @Req() req?: Request,
+) {
+  this.logger.log(`Updating item ID: ${id}`, {
+    name: dto.name,
+    barcode: dto.barcode,
+    hasFile: !!file,
+    hasBase64: !!dto.imageBase64,
+  });
+
+  try {
+    const userId = this.extractUserIdFromRequest(req);
+    const result = await this.stockService.updateItem(id, dto, file, userId);
+    this.logger.log(`Item updated successfully: ${id}`);
+    return result;
+  } catch (err: any) {
+    this.logger.error(`Failed to update item: ${err.message}`, err.stack);
+    if (err?.status && err?.response) throw err;
+    throw new InternalServerErrorException(err.message || 'Failed to update item');
+  }
+}
 
 
 
