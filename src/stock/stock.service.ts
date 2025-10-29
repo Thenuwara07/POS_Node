@@ -13,6 +13,7 @@ import { CreateItemWithStockDto } from './dto/create-item-with-stock.dto';
 import { CreateStockDto } from './dto/create-stock.dto';
 import { ImageStorageService } from '../common/upload/image-storage.service';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
+import { UpdateItemDto } from './dto/update-item.dto';
 
 @Injectable()
 export class StockService {
@@ -353,6 +354,72 @@ export class StockService {
 
 
 
+  // ---- ITEM: Update ----
+async updateItem(
+  itemId: number,
+  dto: UpdateItemDto,
+  file?: Express.Multer.File,
+  userId?: number,
+) {
+  this.logger.log(`Updating item ID: ${itemId}`, {
+    userId,
+    hasFile: !!file,
+    hasBase64: !!dto.imageBase64,
+  });
+
+  try {
+    const existing = await this.prisma.item.findUnique({ where: { id: itemId } });
+    if (!existing) {
+      this.logger.warn(`Item not found: ${itemId}`);
+      throw new NotFoundException(`Item ID ${itemId} not found`);
+    }
+
+    // Validate foreign keys if provided
+    if (dto.categoryId) await this.ensureCategoryExists(dto.categoryId);
+    if (dto.supplierId) await this.ensureSupplierExists(dto.supplierId);
+
+    // Handle new image if uploaded or base64 provided
+    let imagePath = existing.imagePath;
+    if (file) {
+      const absPath = file.path.replace(/\\/g, '/');
+      const idx = absPath.indexOf('/uploads/');
+      imagePath = idx >= 0 ? absPath.slice(idx + 1) : absPath;
+      this.logger.log(`Updated image file path: ${imagePath}`);
+    } else if (dto.imageBase64) {
+      imagePath = this.imageStorage.saveBase64ItemImage(dto.imageBase64);
+      this.logger.log(`Updated base64 image path: ${imagePath}`);
+    }
+
+    const updatedItem = await this.prisma.item.update({
+      where: { id: itemId },
+      data: {
+        name: dto.name ?? existing.name,
+        barcode: dto.barcode ?? existing.barcode,
+        categoryId: dto.categoryId ?? existing.categoryId,
+        supplierId: dto.supplierId ?? existing.supplierId,
+        reorderLevel: dto.reorderLevel ?? existing.reorderLevel,
+        colorCode: dto.colorCode ?? existing.colorCode,
+        remark: dto.remark ?? existing.remark,
+        imagePath,
+        createdById: userId ?? existing.createdById,
+      },
+    });
+
+    this.logger.log(`Item updated successfully in DB: ${updatedItem.id}`);
+    return updatedItem;
+  } catch (err) {
+    this.logger.error(`Failed to update item: ${err.message}`, err.stack);
+    this.handlePrismaError(err, 'updateItem');
+  }
+}
+
+
+
+
+  // ---------------------------------------------------------------------------------------------
+
+
+
 
 
   async listItems(): Promise<GetAllItemsDto[]> {
@@ -420,4 +487,106 @@ export class StockService {
       throw new InternalServerErrorException('Failed to fetch item summaries');
     }
   }
+
+
+
+// -----------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+  // ---- ITEM: Set status (0=disabled, 1=enabled) ----
+async setItemStatus(itemId: number, status: number, userId?: number) {
+  this.logger.log(`setItemStatus: itemId=${itemId}, status=${status}, userId=${userId}`);
+
+  if (status !== 0 && status !== 1) {
+    throw new BadRequestException('status must be 0 or 1');
+  }
+
+  const existing = await this.prisma.item.findUnique({
+    where: { id: itemId },
+    select: { id: true, status: true },
+  });
+  if (!existing) {
+    this.logger.warn(`Item not found: ${itemId}`);
+    throw new NotFoundException(`Item ID ${itemId} not found`);
+  }
+
+  if (existing.status === status) {
+    this.logger.log(`Item ${itemId} already in desired status ${status}`);
+    return { id: existing.id, status: existing.status, unchanged: true };
+  }
+
+  const updated = await this.prisma.item.update({
+    where: { id: itemId },
+    data: {
+      status,
+      // (Optional) updatedById: userId,
+    },
+    select: { id: true, name: true, status: true, categoryId: true, supplierId: true },
+  });
+
+  this.logger.log(`Item ${itemId} status updated => ${status}`);
+  return updated;
+}
+
+
+
+
+
+// ---------------------------------------------------------------------------------------------------------
+
+
+
+
+
+// ---- ITEMS: List by status with your existing summary projection ----
+async listItemsByStatus(status: 0 | 1): Promise<GetAllItemsDto[]> {
+  this.logger.log(`Fetching items by status=${status}`);
+  try {
+    const items = await this.prisma.item.findMany({
+      where: { status },
+      select: {
+        id: true,
+        name: true,
+        reorderLevel: true,
+        status: true,
+        category: { select: { category: true } },
+        createdBy: { select: { name: true, email: true } },
+        stock: { select: { quantity: true, unitPrice: true, sellPrice: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const safeDiv = (a: number, b: number) => (b === 0 ? 0 : a / b);
+
+    return items.map<GetAllItemsDto>((it) => {
+      const totalQty = it.stock.reduce((sum, s) => sum + s.quantity, 0);
+      const sumCostQty = it.stock.reduce((sum, s) => sum + s.unitPrice * s.quantity, 0);
+      const sumSellQty = it.stock.reduce((sum, s) => sum + s.sellPrice * s.quantity, 0);
+
+      const unitCost = Number(safeDiv(sumCostQty, totalQty).toFixed(2));
+      const salesPrice = Number(safeDiv(sumSellQty, totalQty).toFixed(2));
+      const total = Number((totalQty * salesPrice).toFixed(2));
+      const createdBy = it.createdBy?.name ?? it.createdBy?.email ?? null;
+
+      return {
+        itemId: it.id,
+        name: it.name,
+        categoryName: it.category.category,
+        createdBy,
+        qty: totalQty,
+        unitCost,
+        salesPrice,
+        status: it.status ?? 0,
+        total,
+      };
+    });
+  } catch (err) {
+    this.logger.error('Failed to fetch items by status', err.stack);
+    throw new InternalServerErrorException('Failed to fetch items by status');
+  }
+}
 }

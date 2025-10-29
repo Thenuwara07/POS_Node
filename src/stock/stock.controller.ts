@@ -11,6 +11,9 @@ import {
   UsePipes,
   ValidationPipe,
   Req,
+  Param,
+  Patch,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -38,6 +41,7 @@ import { itemImageMulterOptions } from '../common/upload/multer.options';
 import { categoryImageMulterOptions } from '../common/upload/multer.category.options';
 import type { Request } from 'express';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
+import { UpdateItemDto } from './dto/update-item.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -293,6 +297,110 @@ export class StockController {
 
 
 
+  // ---------------------------------------------------------------------------------------------
+
+
+
+  // --- ITEM: Update ---
+@Patch('items/:id')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiConsumes('multipart/form-data')
+@UseInterceptors(FileInterceptor('image', itemImageMulterOptions()))
+@ApiOperation({ summary: 'Update an existing item (supports image upload or base64)' })
+@ApiOkResponse({ description: 'Item updated successfully.' })
+@ApiBadRequestResponse({ description: 'Validation failed or item not found.' })
+@ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+@ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+@ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+async updateItem(
+  @Param('id') id: number,
+  @Body() dto: UpdateItemDto,
+  @UploadedFile() file?: Express.Multer.File,
+  @Req() req?: Request,
+) {
+  this.logger.log(`Updating item ID: ${id}`, {
+    name: dto.name,
+    barcode: dto.barcode,
+    hasFile: !!file,
+    hasBase64: !!dto.imageBase64,
+  });
+
+  try {
+    const userId = this.extractUserIdFromRequest(req);
+    const result = await this.stockService.updateItem(id, dto, file, userId);
+    this.logger.log(`Item updated successfully: ${id}`);
+    return result;
+  } catch (err: any) {
+    this.logger.error(`Failed to update item: ${err.message}`, err.stack);
+    if (err?.status && err?.response) throw err;
+    throw new InternalServerErrorException(err.message || 'Failed to update item');
+  }
+}
+
+
+
+
+  //----------------------------------------------------------------------------------------------------
+
+
+
+  // --- ITEM: Disable (status -> 0) ---
+@Patch('items/:id/disable')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'Disable an item (soft delete: status = 0)' })
+@ApiOkResponse({ description: 'Item disabled.' })
+async disableItem(
+  @Param('id', ParseIntPipe) id: number,
+  @Req() req?: Request,
+) {
+  this.logger.log(`Disabling item ID: ${id}`);
+  const userId = this.extractUserIdFromRequest(req);
+  return await this.stockService.setItemStatus(id, 0, userId);
+}
+
+// --- ITEM: Enable (status -> 1) ---
+@Patch('items/:id/enable')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'Enable an item (status = 1)' })
+@ApiOkResponse({ description: 'Item enabled.' })
+async enableItem(
+  @Param('id', ParseIntPipe) id: number,
+  @Req() req?: Request,
+) {
+  this.logger.log(`Enabling item ID: ${id}`);
+  const userId = this.extractUserIdFromRequest(req);
+  return await this.stockService.setItemStatus(id, 1, userId);
+}
+
+// --- ITEMS: Get all disabled (status = 0) ---
+@Get('items/disabled')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'List all disabled items (status = 0) with summaries' })
+@ApiOkResponse({ description: 'Disabled items fetched.', type: [GetAllItemsDto] })
+async listDisabledItems(): Promise<GetAllItemsDto[]> {
+  this.logger.log('Fetching disabled items (status=0)');
+  return await this.stockService.listItemsByStatus(0);
+}
+
+// --- ITEMS: Get all enabled (status = 1) ---
+@Get('items/enabled')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'List all enabled items (status = 1) with summaries' })
+@ApiOkResponse({ description: 'Enabled items fetched.', type: [GetAllItemsDto] })
+async listEnabledItems(): Promise<GetAllItemsDto[]> {
+  this.logger.log('Fetching enabled items (status=1)');
+  return await this.stockService.listItemsByStatus(1);
+}
 
   // ---------------------------------------------------------------------------------------------
 
