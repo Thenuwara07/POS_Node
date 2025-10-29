@@ -52,7 +52,17 @@ async function bootstrap() {
     .setTitle('POS API')
     .setDescription('Point of Sale System API')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token without Bearer prefix',
+        in: 'header',
+      },
+      'JWT-auth', // 🔹 must match your @ApiBearerAuth('JWT-auth')
+    )
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
