@@ -13,6 +13,7 @@ import {
   Req,
   Param,
   Patch,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -340,6 +341,66 @@ async updateItem(
 
 
 
+
+  //----------------------------------------------------------------------------------------------------
+
+
+
+  // --- ITEM: Disable (status -> 0) ---
+@Patch('items/:id/disable')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'Disable an item (soft delete: status = 0)' })
+@ApiOkResponse({ description: 'Item disabled.' })
+async disableItem(
+  @Param('id', ParseIntPipe) id: number,
+  @Req() req?: Request,
+) {
+  this.logger.log(`Disabling item ID: ${id}`);
+  const userId = this.extractUserIdFromRequest(req);
+  return await this.stockService.setItemStatus(id, 0, userId);
+}
+
+// --- ITEM: Enable (status -> 1) ---
+@Patch('items/:id/enable')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'Enable an item (status = 1)' })
+@ApiOkResponse({ description: 'Item enabled.' })
+async enableItem(
+  @Param('id', ParseIntPipe) id: number,
+  @Req() req?: Request,
+) {
+  this.logger.log(`Enabling item ID: ${id}`);
+  const userId = this.extractUserIdFromRequest(req);
+  return await this.stockService.setItemStatus(id, 1, userId);
+}
+
+// --- ITEMS: Get all disabled (status = 0) ---
+@Get('items/disabled')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'List all disabled items (status = 0) with summaries' })
+@ApiOkResponse({ description: 'Disabled items fetched.', type: [GetAllItemsDto] })
+async listDisabledItems(): Promise<GetAllItemsDto[]> {
+  this.logger.log('Fetching disabled items (status=0)');
+  return await this.stockService.listItemsByStatus(0);
+}
+
+// --- ITEMS: Get all enabled (status = 1) ---
+@Get('items/enabled')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'List all enabled items (status = 1) with summaries' })
+@ApiOkResponse({ description: 'Enabled items fetched.', type: [GetAllItemsDto] })
+async listEnabledItems(): Promise<GetAllItemsDto[]> {
+  this.logger.log('Fetching enabled items (status=1)');
+  return await this.stockService.listItemsByStatus(1);
+}
 
   // ---------------------------------------------------------------------------------------------
 

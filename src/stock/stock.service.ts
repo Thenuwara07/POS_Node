@@ -418,6 +418,10 @@ async updateItem(
 
   // ---------------------------------------------------------------------------------------------
 
+
+
+
+
   async listItems(): Promise<GetAllItemsDto[]> {
     this.logger.log('Fetching all items with summaries');
     try {
@@ -483,4 +487,106 @@ async updateItem(
       throw new InternalServerErrorException('Failed to fetch item summaries');
     }
   }
+
+
+
+// -----------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+  // ---- ITEM: Set status (0=disabled, 1=enabled) ----
+async setItemStatus(itemId: number, status: number, userId?: number) {
+  this.logger.log(`setItemStatus: itemId=${itemId}, status=${status}, userId=${userId}`);
+
+  if (status !== 0 && status !== 1) {
+    throw new BadRequestException('status must be 0 or 1');
+  }
+
+  const existing = await this.prisma.item.findUnique({
+    where: { id: itemId },
+    select: { id: true, status: true },
+  });
+  if (!existing) {
+    this.logger.warn(`Item not found: ${itemId}`);
+    throw new NotFoundException(`Item ID ${itemId} not found`);
+  }
+
+  if (existing.status === status) {
+    this.logger.log(`Item ${itemId} already in desired status ${status}`);
+    return { id: existing.id, status: existing.status, unchanged: true };
+  }
+
+  const updated = await this.prisma.item.update({
+    where: { id: itemId },
+    data: {
+      status,
+      // (Optional) updatedById: userId,
+    },
+    select: { id: true, name: true, status: true, categoryId: true, supplierId: true },
+  });
+
+  this.logger.log(`Item ${itemId} status updated => ${status}`);
+  return updated;
+}
+
+
+
+
+
+// ---------------------------------------------------------------------------------------------------------
+
+
+
+
+
+// ---- ITEMS: List by status with your existing summary projection ----
+async listItemsByStatus(status: 0 | 1): Promise<GetAllItemsDto[]> {
+  this.logger.log(`Fetching items by status=${status}`);
+  try {
+    const items = await this.prisma.item.findMany({
+      where: { status },
+      select: {
+        id: true,
+        name: true,
+        reorderLevel: true,
+        status: true,
+        category: { select: { category: true } },
+        createdBy: { select: { name: true, email: true } },
+        stock: { select: { quantity: true, unitPrice: true, sellPrice: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const safeDiv = (a: number, b: number) => (b === 0 ? 0 : a / b);
+
+    return items.map<GetAllItemsDto>((it) => {
+      const totalQty = it.stock.reduce((sum, s) => sum + s.quantity, 0);
+      const sumCostQty = it.stock.reduce((sum, s) => sum + s.unitPrice * s.quantity, 0);
+      const sumSellQty = it.stock.reduce((sum, s) => sum + s.sellPrice * s.quantity, 0);
+
+      const unitCost = Number(safeDiv(sumCostQty, totalQty).toFixed(2));
+      const salesPrice = Number(safeDiv(sumSellQty, totalQty).toFixed(2));
+      const total = Number((totalQty * salesPrice).toFixed(2));
+      const createdBy = it.createdBy?.name ?? it.createdBy?.email ?? null;
+
+      return {
+        itemId: it.id,
+        name: it.name,
+        categoryName: it.category.category,
+        createdBy,
+        qty: totalQty,
+        unitCost,
+        salesPrice,
+        status: it.status ?? 0,
+        total,
+      };
+    });
+  } catch (err) {
+    this.logger.error('Failed to fetch items by status', err.stack);
+    throw new InternalServerErrorException('Failed to fetch items by status');
+  }
+}
 }
