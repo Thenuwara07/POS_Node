@@ -16,6 +16,7 @@ import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
 import { Prisma } from '@prisma/client';
+import { RestockItemDto } from './dto/restock-item.dto';
 
 @Injectable()
 export class StockService {
@@ -631,7 +632,7 @@ async listItems(): Promise<GetAllItemsDto[]> {
       category: { select: { category: true } },
       createdBy: { select: { name: true } },
       stock: {
-        select: { id: true, batchId: true, quantity: true, unitPrice: true, sellPrice: true },
+        select: { id: true, batchId: true, quantity: true, unitPrice: true, sellPrice: true ,supplierId: true},
         orderBy: { id: 'desc' }, // newest first
       },
     },
@@ -646,6 +647,8 @@ async listItems(): Promise<GetAllItemsDto[]> {
   const latest = item.stock[0];
   const unitPrice = latest?.unitPrice ?? 0;
   const sellPrice = latest?.sellPrice ?? 0;
+  const latestSupplierId = latest?.supplierId ?? null; // if exists, supplierId; else null
+  const latestBatchId = latest?.batchId ?? null;
 
   const dto: RestockDto = {
     itemId: item.id,
@@ -657,10 +660,147 @@ async listItems(): Promise<GetAllItemsDto[]> {
     sellPrice,
     status: item.status ?? 0,
     // Not needed for lookup; UI will generate a new one at submit time
-    batchId: 0,
-    supplierId: undefined
+    batchId:latestBatchId,
+    supplierId: latestSupplierId,
   };
 
   return dto;
 }
+
+
+
+
+// ----------------------------------------------------------------------------------
+
+
+
+
+
+// Restock item (when sell price not eq new sell price it shoud be create new batchId and update stock. sell price eq new sellprice dont need to create
+// new batchid you can update stock with same batchid)
+
+async restockItem(itemId: number, dto: RestockItemDto) {
+    this.logger.log('restockItem()', { itemId, dto });
+
+    try {
+      // Validate existence
+      const item = await this.prisma.item.findUnique({
+        where: { id: itemId },
+        select: { id: true, supplierId: true },
+      });
+      if (!item) throw new NotFoundException(`Item ID ${itemId} not found`);
+
+      // Validate supplier
+      const supplier = await this.prisma.supplier.findUnique({
+        where: { id: dto.supplierId },
+        select: { id: true },
+      });
+      if (!supplier) throw new NotFoundException(`Supplier ID ${dto.supplierId} not found`);
+
+      // Latest batch for this item
+      const latest = await this.prisma.stock.findFirst({
+        where: { itemId },
+        orderBy: { id: 'desc' },
+      });
+
+      // Helper: price equality with small tolerance
+      const eq = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+
+      // No existing stock -> must create a new batch (need both prices)
+      if (!latest) {
+        if (dto.sellPrice == null || dto.unitPrice == null) {
+          throw new BadRequestException(
+            'No existing batches: sellPrice and unitPrice are required to create the first batch.',
+          );
+        }
+        const newBatchId = `${itemId}-${Date.now()}`;
+
+        const created = await this.prisma.stock.create({
+          data: {
+            batchId: newBatchId,
+            itemId,
+            supplierId: dto.supplierId,
+            quantity: dto.qty,
+            unitPrice: dto.unitPrice,
+            sellPrice: dto.sellPrice,
+            discountAmount: 0,
+          },
+        });
+
+        return {
+          mode: 'new-batch',
+          stockId: created.id,
+          batchId: created.batchId,
+          qtyAdded: dto.qty,
+          unitPrice: created.unitPrice,
+          sellPrice: created.sellPrice,
+        };
+      }
+
+      // We have an existing "latest" batch
+      const latestSell = latest.sellPrice;
+
+      // Decide whether we append or create a new batch
+      // Case A: sellPrice provided AND different from latest -> new batch
+      if (dto.sellPrice != null && !eq(dto.sellPrice, latestSell)) {
+        if (dto.unitPrice == null) {
+          throw new BadRequestException(
+            'Creating a new batch requires unitPrice when sellPrice differs from the latest batch.',
+          );
+        }
+        const newBatchId = `${itemId}-${Date.now()}`;
+
+        const created = await this.prisma.stock.create({
+          data: {
+            batchId: newBatchId,
+            itemId,
+            supplierId: dto.supplierId,
+            quantity: dto.qty,
+            unitPrice: dto.unitPrice,
+            sellPrice: dto.sellPrice,
+            discountAmount: 0,
+          },
+        });
+
+        return {
+          mode: 'new-batch',
+          stockId: created.id,
+          batchId: created.batchId,
+          qtyAdded: dto.qty,
+          unitPrice: created.unitPrice,
+          sellPrice: created.sellPrice,
+        };
+      }
+
+      // Case B: sellPrice not provided OR equals latest -> append to latest batch (no new batchId)
+      const updated = await this.prisma.stock.update({
+        where: { id: latest.id },
+        data: {
+          quantity: latest.quantity + dto.qty,
+          // If unitPrice provided, update it; else keep as-is
+          ...(dto.unitPrice != null ? { unitPrice: dto.unitPrice } : {}),
+          // sellPrice stays same as latest
+        },
+      });
+
+      return {
+        mode: 'append-latest',
+        stockId: updated.id,
+        batchId: updated.batchId,
+        qtyAdded: dto.qty,
+        newQty: updated.quantity,
+        unitPrice: updated.unitPrice,
+        sellPrice: updated.sellPrice,
+      };
+    } catch (err) {
+      this.logger.error('restockItem() failed', err instanceof Error ? err.stack : undefined);
+      // Reuse your centralized mapper
+      this.handlePrismaError(err, 'restockItem');
+    }
+  }
+
+
+
+
+
 }

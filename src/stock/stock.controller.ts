@@ -46,6 +46,7 @@ import type { Request } from 'express';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
+import { RestockItemDto } from './dto/restock-item.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -406,7 +407,14 @@ async listEnabledItems(): Promise<GetAllItemsDto[]> {
   return await this.stockService.listItemsByStatus(1);
 }
 
+
+
+
+
   // ---------------------------------------------------------------------------------------------
+
+
+
 
 
 
@@ -434,6 +442,53 @@ async lookupForRestock(
 
 
   
+
+
+
+
+// ----------------------------------------------------------------------------------------------
+
+
+
+
+
+@Post('restock/:id')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({
+  summary: 'Restock an item',
+  description:
+    'If incoming sellPrice equals latest batch sellPrice, append qty to latest batch. Otherwise create a new batch.',
+})
+@ApiOkResponse({ description: 'Restock processed.' })
+@ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+@ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+@ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+@ApiNotFoundResponse({ description: 'Item or Supplier not found.' })
+async restockItem(
+  @Param('id', ParseIntPipe) id: number,
+  @Body() dto: RestockItemDto,
+) {
+  this.logger.log(`Restock request: itemId=${id}`, {
+    supplierId: dto.supplierId,
+    qty: dto.qty,
+    unitPrice: dto.unitPrice,
+    sellPrice: dto.sellPrice,
+  });
+
+  try {
+    const result = await this.stockService.restockItem(id, dto);
+    this.logger.log(`Restock OK: itemId=${id}`, result);
+    return result;
+  } catch (err: any) {
+    this.logger.error(`Restock failed: ${err?.message}`, err?.stack);
+    if (err?.status && err?.response) throw err; // rethrow mapped Nest errors
+    throw new InternalServerErrorException(err?.message || 'Failed to restock item');
+  }
+}
+
+
 
 
 
