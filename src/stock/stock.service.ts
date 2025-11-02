@@ -14,6 +14,8 @@ import { CreateStockDto } from './dto/create-stock.dto';
 import { ImageStorageService } from '../common/upload/image-storage.service';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import { RestockDto } from './dto/restock.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class StockService {
@@ -597,4 +599,68 @@ async listItems(): Promise<GetAllItemsDto[]> {
       throw new InternalServerErrorException('Failed to fetch items by status');
     }
   }
+
+
+
+  
+
+
+  // -----------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+  // LookUp for restock
+
+  async lookupItemForRestock(q: string): Promise<RestockDto> {
+  // Try to interpret q
+  const isNumericId = /^\d+$/.test(q);
+  const whereOr: Prisma.ItemWhereInput[] = [
+    { barcode: q },                                        // exact barcode
+    { name: { contains: q, mode: 'insensitive' } },        // partial name
+  ];
+  if (isNumericId) whereOr.unshift({ id: Number(q) });     // numeric id first
+
+  const item = await this.prisma.item.findFirst({
+    where: { OR: whereOr },
+    include: {
+      category: { select: { category: true } },
+      createdBy: { select: { name: true } },
+      stock: {
+        select: { id: true, batchId: true, quantity: true, unitPrice: true, sellPrice: true },
+        orderBy: { id: 'desc' }, // newest first
+      },
+    },
+  });
+
+  if (!item) throw new NotFoundException('No matching item found');
+
+  // Aggregate current quantity
+  const totalQty = item.stock.reduce((sum, s) => sum + (Number.isFinite(s.quantity) ? s.quantity : 0), 0);
+
+  // Use most recent batch prices (if any)
+  const latest = item.stock[0];
+  const unitPrice = latest?.unitPrice ?? 0;
+  const sellPrice = latest?.sellPrice ?? 0;
+
+  const dto: RestockDto = {
+    itemId: item.id,
+    name: item.name,
+    categoryName: item.category?.category ?? '(Uncategorized)',
+    createdBy: item.createdBy?.name ?? null,
+    qty: totalQty,
+    unitPrice,
+    sellPrice,
+    status: item.status ?? 0,
+    // Not needed for lookup; UI will generate a new one at submit time
+    batchId: 0,
+    supplierId: undefined
+  };
+
+  return dto;
+}
 }

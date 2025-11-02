@@ -14,6 +14,8 @@ import {
   Param,
   Patch,
   ParseIntPipe,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -30,6 +32,7 @@ import {
   ApiUnauthorizedResponse,
   ApiInternalServerErrorResponse,
   ApiBody,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -42,6 +45,7 @@ import { categoryImageMulterOptions } from '../common/upload/multer.category.opt
 import type { Request } from 'express';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import { RestockDto } from './dto/restock.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -406,17 +410,29 @@ async listEnabledItems(): Promise<GetAllItemsDto[]> {
 
 
 
-  // GET Low Stock item
-  @Get('low-stock-item')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
-  @ApiBearerAuth('jwt-auth')
-  @ApiOperation({summary: 'List low stock items'})
-  @ApiOkResponse({ description: 'Low sto fetched.', type: [GetAllItemsDto] })
-  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
-  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
-  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
-  // async getAllLowStockItem(): promise<>
+@Get('restock/lookup')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({
+  summary: 'Lookup item for restock by id | name | barcode',
+  description:
+    'Returns item details for the restock UI. q can be numeric ID, exact barcode, or a (case-insensitive) partial name.',
+})
+@ApiOkResponse({ description: 'Restock details fetched.', type: RestockDto })
+@ApiBadRequestResponse({ description: 'Missing or invalid query.' })
+@ApiNotFoundResponse({ description: 'Item not found.' })
+async lookupForRestock(
+  @Query('q') q?: string,
+): Promise<RestockDto> {
+  this.logger.log(`Restock lookup for q="${q}"`);
+  if (!q || !q.trim()) {
+    throw new BadRequestException('Query "q" is required.');
+  }
+  return this.stockService.lookupItemForRestock(q.trim());
+}
+
+
   
 
 

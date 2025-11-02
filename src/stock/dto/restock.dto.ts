@@ -18,18 +18,17 @@ export class RestockDto{
     qty!: number;
   
     @ApiProperty()
-    unitCost!: number;
+    unitPrice!: number;
   
     @ApiProperty()
-    salesPrice!: number;
+    sellPrice!: number;
   
     @ApiProperty()
     status!: number;
-  
-    @ApiProperty()
-    total!: number;
 
     @ApiProperty()
     batchId!: number;
+  supplierId: any;
+
 }
 
