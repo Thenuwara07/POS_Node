@@ -405,6 +405,24 @@ async listEnabledItems(): Promise<GetAllItemsDto[]> {
   // ---------------------------------------------------------------------------------------------
 
 
+
+  // GET Low Stock item
+  @Get('low-stock-item')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('jwt-auth')
+  @ApiOperation({summary: 'List low stock items'})
+  @ApiOkResponse({ description: 'Low sto fetched.', type: [GetAllItemsDto] })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  // async getAllLowStockItem(): promise<>
+  
+
+
+
+  // ---------------------------------------------------------------------------------------------
+
   /**
    * Extract user ID from JWT token in request
    */
