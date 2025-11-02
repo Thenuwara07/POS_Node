@@ -14,6 +14,8 @@ import {
   Param,
   Patch,
   ParseIntPipe,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -30,6 +32,7 @@ import {
   ApiUnauthorizedResponse,
   ApiInternalServerErrorResponse,
   ApiBody,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -42,6 +45,8 @@ import { categoryImageMulterOptions } from '../common/upload/multer.category.opt
 import type { Request } from 'express';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
+import { RestockDto } from './dto/restock.dto';
+import { RestockItemDto } from './dto/restock-item.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -402,8 +407,92 @@ async listEnabledItems(): Promise<GetAllItemsDto[]> {
   return await this.stockService.listItemsByStatus(1);
 }
 
+
+
+
+
   // ---------------------------------------------------------------------------------------------
 
+
+
+
+
+
+@Get('restock/lookup')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({
+  summary: 'Lookup item for restock by id | name | barcode',
+  description:
+    'Returns item details for the restock UI. q can be numeric ID, exact barcode, or a (case-insensitive) partial name.',
+})
+@ApiOkResponse({ description: 'Restock details fetched.', type: RestockDto })
+@ApiBadRequestResponse({ description: 'Missing or invalid query.' })
+@ApiNotFoundResponse({ description: 'Item not found.' })
+async lookupForRestock(
+  @Query('q') q?: string,
+): Promise<RestockDto> {
+  this.logger.log(`Restock lookup for q="${q}"`);
+  if (!q || !q.trim()) {
+    throw new BadRequestException('Query "q" is required.');
+  }
+  return this.stockService.lookupItemForRestock(q.trim());
+}
+
+
+  
+
+
+
+
+// ----------------------------------------------------------------------------------------------
+
+
+
+
+
+@Post('restock/:id')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('STOCKKEEPER')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({
+  summary: 'Restock an item',
+  description:
+    'If incoming sellPrice equals latest batch sellPrice, append qty to latest batch. Otherwise create a new batch.',
+})
+@ApiOkResponse({ description: 'Restock processed.' })
+@ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+@ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+@ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+@ApiNotFoundResponse({ description: 'Item or Supplier not found.' })
+async restockItem(
+  @Param('id', ParseIntPipe) id: number,
+  @Body() dto: RestockItemDto,
+) {
+  this.logger.log(`Restock request: itemId=${id}`, {
+    supplierId: dto.supplierId,
+    qty: dto.qty,
+    unitPrice: dto.unitPrice,
+    sellPrice: dto.sellPrice,
+  });
+
+  try {
+    const result = await this.stockService.restockItem(id, dto);
+    this.logger.log(`Restock OK: itemId=${id}`, result);
+    return result;
+  } catch (err: any) {
+    this.logger.error(`Restock failed: ${err?.message}`, err?.stack);
+    if (err?.status && err?.response) throw err; // rethrow mapped Nest errors
+    throw new InternalServerErrorException(err?.message || 'Failed to restock item');
+  }
+}
+
+
+
+
+
+  // ---------------------------------------------------------------------------------------------
 
   /**
    * Extract user ID from JWT token in request
