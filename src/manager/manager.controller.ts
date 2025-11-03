@@ -47,11 +47,11 @@ export class ManagerController {
   constructor(private readonly managerService: ManagerService) {}
 
   // --- CREATE MANAGER ---
-  @Post('add-manager')
+  @Post('add-user')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create a new manager' })
+  @ApiOperation({ summary: 'Create a new user' })
   @ApiCreatedResponse({ description: 'Manager created.' })
   @ApiBadRequestResponse({ description: 'Invalid input or duplicate email.' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
@@ -68,11 +68,11 @@ export class ManagerController {
   }
 
   // --- GET ALL MANAGERS ---
-  @Get('get-managers')
+  @Get('get-users')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles( 'MANAGER')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get all managers' })
+  @ApiOperation({ summary: 'Get all users' })
   @ApiOkResponse({ description: 'Managers fetched.' })
   async findAll(
     @Query('search') search?: string,
