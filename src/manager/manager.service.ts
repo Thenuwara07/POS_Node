@@ -13,6 +13,7 @@ import { UpdateManagerDto } from './dto/update-manager.dto';
 import { hash, compare } from 'bcryptjs';
 import { Role } from '@prisma/client';
 
+
 @Injectable()
 export class ManagerService {
   private readonly logger = new Logger(ManagerService.name);
@@ -203,4 +204,119 @@ export class ManagerService {
       this.handlePrismaError(err, 'getAuditLogs');
     }
   }
+
+  async findAllItems() {
+    try {
+      const items = await this.prisma.item.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          barcode: true,
+          category: { 
+            select: { id: true, category: true } 
+          },
+          stock: {
+            select: {
+              itemId: true,
+              quantity: true,
+              unitPrice: true,
+              sellPrice: true,
+            },
+          },
+        },
+      });
+
+      return items;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllItems');
+    }
+  }
+
+  async findAllCustomers() {
+    try {
+      const customers = await this.prisma.customer.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          contact: true,
+        },
+      });
+
+      return customers;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllCustomers');
+    }
+  }
+
+  async findAllUsers() {
+    try {
+      const users = await this.prisma.user.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      return users;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllUsers');
+    }
+  }
+
+
+  async findAllSuppliers() {
+    try {
+      const suppliers = await this.prisma.supplier.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          contact: true,
+          email: true,
+          address: true,
+          status: true,
+        },
+      });
+
+      return suppliers;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllSuppliers');
+    }
+  }
+
+  async findAllStocks() {
+    try {
+      const stocks = await this.prisma.stock.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          item: { 
+            select: { 
+              id: true,
+              name: true,
+              barcode: true,
+              reorderLevel: true,
+              category: { 
+                select: { id: true, category: true } 
+              },
+            } 
+          },
+          quantity: true,
+
+        },
+      });
+
+      return stocks;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllStocks');
+    }
+  }
+
 }
+
