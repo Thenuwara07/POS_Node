@@ -318,5 +318,25 @@ export class ManagerService {
     }
   }
 
-}
+  async findAllInvoices() {
+    try {
+      const invoices = await this.prisma.payment.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true,
+          customer: { select: { name: true } },
+          type: true,
+          amount: true,
+          
+        },
+      });
 
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllInvoices');
+    }
+  }
+
+}

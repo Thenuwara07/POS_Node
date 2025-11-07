@@ -267,4 +267,23 @@ export class ManagerController {
     }
   }
 
+  //Invoice Details ----
+  @Get('invoices')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get invoice list' })
+  @ApiOkResponse({ description: 'Invoices fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllInvoices() {
+    try {
+      return await this.managerService.findAllInvoices();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch invoices', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch invoices');
+    }
+  }
+
 }
