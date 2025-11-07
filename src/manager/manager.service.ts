@@ -320,17 +320,26 @@ export class ManagerService {
 
   async findAllInvoices() {
     try {
-      const invoices = await this.prisma.payment.findMany({
+      const invoicesRaw = await this.prisma.payment.findMany({
         orderBy: { id: 'desc' },
         select: {
           id: true,
           saleInvoiceId: true,
-          date: true,
+          date: true, // bigint epoch (likely seconds)
           customer: { select: { name: true } },
           type: true,
           amount: true,
-          
         },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; // 10 digits => seconds, 13 => ms
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
       });
 
       return invoices;
