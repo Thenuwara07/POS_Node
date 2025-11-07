@@ -348,4 +348,94 @@ export class ManagerService {
     }
   }
 
+
+   async findAllCardPayments() {
+    try {
+      const invoicesRaw = await this.prisma.payment.findMany({
+        where: { type: 'CARD' },
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true,
+          type: true,
+          amount: true,
+        },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; 
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
+      });
+
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllCardPayments');
+    }
+  }
+
+  async findAllCashPayments() {
+    try {
+      const invoicesRaw = await this.prisma.payment.findMany({
+        where: { type: 'CASH' },
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true,
+          type: true,
+          amount: true,
+        },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; 
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
+      });
+
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllCashPayments');
+    }
+  }
+
+  async findAllDailySales() {
+    try {
+      const invoicesRaw = await this.prisma.payment.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          saleInvoiceId: true,
+          date: true, // bigint epoch (likely seconds)
+          customer: { select: { name: true } },
+          type: true,
+          amount: true,
+        },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; // 10 digits => seconds, 13 => ms
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
+      });
+
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllInvoices');
+    }
+  }
+
 }

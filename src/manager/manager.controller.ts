@@ -286,4 +286,61 @@ export class ManagerController {
     }
   }
 
+  //Card Payment Details ----
+  @Get('card-payments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get card payment list' })
+  @ApiOkResponse({ description: 'Card payments fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllCardPayments() {
+    try {
+      return await this.managerService.findAllCardPayments();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch card payments', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch card payments');
+    }
+  }
+
+  //Cash Payment Details ----
+  @Get('cash-payments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')  
+  @ApiOperation({ summary: 'Get cash payment list' })
+  @ApiOkResponse({ description: 'Cash payments fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllCashPayments() {
+    try {
+      return await this.managerService.findAllCashPayments();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch cash payments', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch cash payments');
+    }
+  }
+
+  //Daily sales report ----
+  @Get('daily-sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')  
+  @ApiOperation({ summary: 'Get daily sales report' })
+  @ApiOkResponse({ description: 'Daily sales report fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllDailySales() {
+    try {
+      return await this.managerService.findAllDailySales();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch daily sales', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch daily sales');
+    }
+  }
+
 }
