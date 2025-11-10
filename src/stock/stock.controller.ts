@@ -47,6 +47,7 @@ import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
 import { RestockItemDto } from './dto/restock-item.dto';
+import { GetLowStockDto } from './dto/get-low-stock.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -416,7 +417,7 @@ async listEnabledItems(): Promise<GetAllItemsDto[]> {
 
 
 
-
+// Look Up Restock Item
 
 @Get('restock/lookup')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -450,7 +451,7 @@ async lookupForRestock(
 
 
 
-
+// Restock item
 
 @Post('restock/:id')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -487,6 +488,33 @@ async restockItem(
     throw new InternalServerErrorException(err?.message || 'Failed to restock item');
   }
 }
+
+
+
+
+
+
+// --------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+@Get('low-stock/items')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'List items at or below reorder level',
+    description:
+      'Returns items whose current total quantity is less than or equal to their reorderLevel. Items with no stock are treated as 0.',
+  })
+  @ApiOkResponse({ description: 'Low stock items fetched.', type: [GetLowStockDto] })
+  async getLowStockItems(): Promise<GetLowStockDto[]> {
+    // No query params required for the basic version.
+    return this.stockService.listLowStockItems();
+  }
+
 
 
 
