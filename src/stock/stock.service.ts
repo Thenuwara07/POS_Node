@@ -15,7 +15,7 @@ import { ImageStorageService } from '../common/upload/image-storage.service';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma';
 import { RestockItemDto } from './dto/restock-item.dto';
 
 @Injectable()
