@@ -11,7 +11,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { CreateManagerDto } from './dto/create-manager.dto';
 import { UpdateManagerDto } from './dto/update-manager.dto';
 import { hash, compare } from 'bcryptjs';
-import { Role } from '../../generated/prisma';
+import { Role } from '../../generated/prisma-client';
 
 @Injectable()
 export class ManagerService {

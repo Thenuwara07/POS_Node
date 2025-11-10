@@ -1,7 +1,7 @@
 // =================== GENERATOR & DATASOURCE ===================
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  output   = "../generated/prisma-client"
 }
 
 datasource db {
@@ -73,6 +73,8 @@ model User {
   priceRulesCreated PriceRule[]   @relation("price_rule_created_by")
   priceRulesUpdated PriceRule[]   @relation("price_rule_updated_by")
   categoriesCreated Category[]    @relation("category_created_by")
+  creditorsCreated  Creditor[]    @relation("creditor_created_by")
+  creditorsUpdated  Creditor[]    @relation("creditor_updated_by")
 
   @@map("user")
 }
@@ -83,6 +85,7 @@ model Customer {
   contact String @unique
 
   payments Payment[]
+  creditors Creditor[]
 
   @@map("customer")
 }
@@ -288,4 +291,28 @@ model PriceRule {
   @@index([createdById])
   @@index([updatedById])
   @@map("price_rule")
+}
+
+model Creditor {
+  id              Int       @id @default(autoincrement())
+  customerContact String    @map("customer_contact")
+  totalDue        Float     @default(0) @map("total_due")
+  notes           String?
+  lastPaymentAt   BigInt?   @map("last_payment_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // optional audit
+  createdById Int?  @map("created_by")
+  updatedById Int?  @map("updated_by")
+  createdBy   User? @relation("creditor_created_by", fields: [createdById], references: [id])
+  updatedBy   User? @relation("creditor_updated_by", fields: [updatedById], references: [id])
+
+  // relations
+  customer Customer? @relation(fields: [customerContact], references: [contact])
+
+  @@index([customerContact])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("creditor")
 }
