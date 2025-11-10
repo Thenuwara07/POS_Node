@@ -1,84 +1,177 @@
-import { Controller, Get, Post, Put, Patch, Delete, Param, Body, ParseIntPipe, UseGuards } from '@nestjs/common';
-import { SupplierService } from './supplier.service';
-import { RolesGuard } from '../auth/roles.guard';
-import { Roles } from '../auth/roles.decorator';
-import { AuthGuard } from '@nestjs/passport';
-import { CreateSupplierDto } from './dto/create-supplier.dto';
-import { UpdateSupplierDto } from './dto/update-supplier.dto';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
+  Body,
+  Controller,
+  Get,
+  InternalServerErrorException,
+  Logger,
+  Post,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  Req,
+  Delete,
+  ParseIntPipe,
+  Param,
+  Patch,
+} from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import {
   ApiBearerAuth,
-  ApiParam,
+  ApiBadRequestResponse,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiTags,
+  ApiUnauthorizedResponse,
+  ApiInternalServerErrorResponse,
   ApiBody,
 } from '@nestjs/swagger';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import type { Request } from 'express';
+import { CreateSupplierDto } from './dto/create-supplier.dto';
+import { UpdateSupplierDto } from './dto/update-supplier.dto';
+import { SupplierService } from './supplier.service';
 
 @ApiTags('supplier')
-@ApiBearerAuth('JWT-auth')
-@UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('StockKeeper')
 @Controller('supplier')
+@UsePipes(
+  new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }),
+)
 export class SupplierController {
+  private readonly logger = new Logger(SupplierController.name);
+
   constructor(private readonly supplierService: SupplierService) {}
 
-  @Post()
+
+
+
+
+  // ---------------------------------------------------------------------------------------------------------
+
+  
+
+  // Add Supplier 
+  @Post('suppliers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new supplier' })
-  @ApiResponse({ status: 201, description: 'Supplier created successfully' })
-  @ApiBody({ type: CreateSupplierDto })
-  create(@Body() dto: CreateSupplierDto) {
-    return this.supplierService.create(dto);
-  }
-
-  @Get()
-  @ApiOperation({ summary: 'Get all suppliers' })
-  @ApiResponse({ status: 200, description: 'List of suppliers' })
-  findAll() {
-    return this.supplierService.findAll();
-  }
-
-  @Get(':id')
-  @ApiOperation({ summary: 'Get supplier by ID' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Supplier found' })
-  @ApiResponse({ status: 404, description: 'Supplier not found' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.supplierService.findOne(id);
-  }
-
-  @Put(':id')
-  @ApiOperation({ summary: 'Update supplier by ID' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiBody({ type: UpdateSupplierDto })
-  @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateSupplierDto) {
-    return this.supplierService.update(id, dto);
-  }
-
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete supplier by ID' })
-  @ApiParam({ name: 'id', type: Number })
-  @ApiResponse({ status: 200, description: 'Supplier deleted successfully' })
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.supplierService.remove(id);
-  }
-
-  @Patch(':id/status')
-  @ApiOperation({ summary: 'Update supplier status (active/inactive)' })
-  @ApiParam({ name: 'id', type: Number })
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        active: { type: 'boolean', example: true },
+        name: { type: 'string'},
+        brand: { type: 'string'},
+        contact: { type: 'string'},
+        email: { type: 'string'},
+        location: { type: 'string'},
+        notes: { type: 'string'},
+        colorCode: { type: 'string'},
       },
+      required: ['name', 'brand', 'contact'],
     },
   })
-  @ApiResponse({ status: 200, description: 'Supplier status updated' })
-  updateStatus(
-    @Param('id', ParseIntPipe) id: number,
-    @Body('active') active: boolean,
-  ) {
-    return this.supplierService.updateStatus(id, active);
+  @ApiCreatedResponse({ description: 'Supplier created.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async createSupplier(@Body() dto: CreateSupplierDto, @Req() req: Request) {
+    try {
+      const userId =
+        (req?.user as any)?.userId ||
+        (req?.user as any)?.sub ||
+        undefined;
+
+      return await this.supplierService.createSupplier(dto, userId);
+    } catch (err: any) {
+      if (err?.status && err?.response) throw err;
+      this.logger.error('Failed to create supplier', err?.stack || err);
+      throw new InternalServerErrorException('Failed to create supplier');
+    }
   }
+
+
+
+
+// --------------------------------------------------------------------------------------------
+
+            // Get all suppliers
+
+  @Get('suppliers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'List suppliers' })
+  @ApiOkResponse({ description: 'Suppliers fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async listSuppliers() {
+    return this.supplierService.listSuppliers();
+  }
+
+
+
+
+  // --------------------------------------------------------------------------------------------------
+
+      // Get supplier by ID
+
+  @Get('suppliers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get supplier by id' })
+  @ApiOkResponse({ description: 'Supplier fetched.' })
+  async getSupplierById(@Param('id', ParseIntPipe) id: number) {
+    return this.supplierService.getSupplierById(id);
+  }
+
+
+
+  // --------------------------------------------------------------------------------------------
+
+      // Update Supplier
+
+  @Patch('suppliers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update supplier (optional)' })
+  @ApiOkResponse({ description: 'Supplier updated.' })
+  async updateSupplier(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSupplierDto,
+    @Req() req: Request,
+  ) {
+    const userId =
+      (req?.user as any)?.userId ||
+      (req?.user as any)?.sub ||
+      undefined;
+    return this.supplierService.updateSupplier(id, dto, userId);
+  }
+
+
+  // ---------------------------------------------------------------------------------
+
+    //  Delete Supplier 
+    
+
+  @Delete('suppliers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete supplier (optional)' })
+  @ApiOkResponse({ description: 'Supplier deleted.' })
+  async deleteSupplier(@Param('id', ParseIntPipe) id: number) {
+    return this.supplierService.deleteSupplier(id);
+  }
+
+
 }

@@ -12,11 +12,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ApiTags, ApiOperation, ApiResponse, ApiBody,ApiBearerAuth  } from '@nestjs/swagger';
-
-class LoginDto {
-  email: string;
-  password: string;
-}
+import { LoginDto } from './dto/login.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -37,7 +33,6 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Tokens returned successfully' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   @ApiBody({ type: LoginDto })
-  @Post('login')
   async login(@Body() body: LoginDto) {
     const { email, password } = body;
     const user = await this.authService.validateUser(email, password);
@@ -77,7 +72,6 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Logout user (invalidate refresh token)' })
   @ApiResponse({ status: 200, description: 'Successfully logged out' })
-  @Post('logout')
   async logout(@Req() req: any) {
     await this.authService.logout(req.user?.sub); // ✅ call service
     return { message: 'Logged out' };

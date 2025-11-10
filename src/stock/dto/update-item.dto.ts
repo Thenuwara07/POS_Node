@@ -1,74 +1,56 @@
-import {
-  IsBoolean,
-  IsIn,
-  IsInt,
-  IsNumber,
-  IsOptional,
-  IsString,
-  Min,
-} from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsInt, IsOptional, IsString, IsHexColor, Min } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
 export class UpdateItemDto {
-  @IsString()
+  @ApiPropertyOptional({ example: 'Fanta' })
   @IsOptional()
+  @IsString()
   name?: string;
 
-  @IsString()
+  @ApiPropertyOptional({ example: '8901234567890' })
   @IsOptional()
+  @IsString()
   barcode?: string;
 
-  @IsString()
+  @ApiPropertyOptional({ example: 1 })
   @IsOptional()
-  unit?: string;
-
+  @Type(() => Number)
+  @Transform(({ value }) => value === '' || value === null ? undefined : Number(value))
   @IsInt()
-  @IsOptional()
   categoryId?: number;
 
-  @IsInt()
+  @ApiPropertyOptional({ example: 2 })
   @IsOptional()
+  @Type(() => Number)
+  @Transform(({ value }) => value === '' || value === null ? undefined : Number(value))
+  @IsInt()
   supplierId?: number;
 
-  @IsString()
+  @ApiPropertyOptional({ example: 1 })
   @IsOptional()
-  @IsIn(['Active', 'Inactive'])
-  status?: string;
-
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  cost?: number;
-
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  markup?: number;
-
-  @IsNumber()
-  @IsOptional()
-  @Min(0)
-  salePrice?: number;
-
+  @Type(() => Number)
+  @Transform(({ value }) => value === '' || value === null ? undefined : Number(value))
   @IsInt()
-  @IsOptional()
   @Min(0)
   reorderLevel?: number;
 
-  @IsBoolean()
+  @ApiPropertyOptional({ example: '#FF5733' })
   @IsOptional()
-  lowStockWarn?: boolean;
-
-  
-
-  @IsString()
-  @IsOptional()
-  gradient?: string | null;
-
-  @IsString()
-  @IsOptional()
-  remark?: string | null;
-
-  @IsString()
-  @IsOptional()
+  @IsHexColor()
   colorCode?: string;
+
+  @ApiPropertyOptional({ example: 'note about item' })
+  @IsOptional()
+  @IsString()
+  remark?: string;
+
+  // @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  // @IsOptional()
+  // image?: any;
+
+  @ApiPropertyOptional({ example: 'data:image/png;base64,iVBORw0K...' })
+  @IsOptional()
+  @IsString()
+  imageBase64?: string;
 }

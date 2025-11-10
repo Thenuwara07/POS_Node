@@ -3,9 +3,8 @@ import { StockController } from './stock.controller';
 import { StockService } from './stock.service';
 import { InternalServerErrorException } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto';
-import { CreateItemDto } from './dto/create-item.dto';
+import { CreateItemWithStockDto } from './dto/create-item-with-stock.dto';
 import { CreateStockDto } from './dto/create-stock.dto';
-import { UpdateItemDto } from './dto/update-item.dto';
 
 describe('StockController', () => {
   let controller: StockController;
@@ -13,9 +12,8 @@ describe('StockController', () => {
 
   const mockStockService = {
     createCategory: jest.fn(),
-    createItem: jest.fn(),
+    createItemWithStock: jest.fn(),
     handlePurchaseRequest: jest.fn(),
-    updateItem: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -39,7 +37,10 @@ describe('StockController', () => {
 
   describe('createCategory', () => {
     it('should successfully create a category', async () => {
-      const dto: CreateCategoryDto = { category: 'Electronics', colorCode: '#FF5733' };
+      const dto: CreateCategoryDto = {
+        category: 'Electronics',
+        colorCode: '#FF5733',
+      };
       mockStockService.createCategory.mockResolvedValue(dto);
 
       expect(await controller.createCategory(dto)).toEqual(dto);
@@ -47,37 +48,60 @@ describe('StockController', () => {
     });
 
     it('should throw an error if category creation fails', async () => {
-      const dto: CreateCategoryDto = { category: 'Electronics', colorCode: '#FF5733' };
+      const dto: CreateCategoryDto = {
+        category: 'Electronics',
+        colorCode: '#FF5733',
+      };
       mockStockService.createCategory.mockRejectedValue(new Error('Error'));
 
-      await expect(controller.createCategory(dto)).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.createCategory(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 
-  describe('createItem', () => {
-    it('should successfully create an item', async () => {
-      const dto: CreateItemDto = {
+  describe('createItemWithStock', () => {
+    it('should successfully create an item with stock', async () => {
+      const dto: CreateItemWithStockDto = {
         name: 'Laptop',
         barcode: 'L001',
         categoryId: 1,
         supplierId: 1,
+        reorderLevel: 5,
+        gradient: 'linear(#0ea5e9, #22d3ee)',
+        remark: 'Wireless mouse',
+        colorCode: '#000000',
+        quantity: 100,
+        unitPrice: 450.0,
+        sellPrice: 650.0,
       };
-      mockStockService.createItem.mockResolvedValue(dto);
+      const file: Express.Multer.File = { buffer: Buffer.from('sample'), originalname: 'test.png' } as any;
+      mockStockService.createItemWithStock.mockResolvedValue(dto);
 
-      expect(await controller.createItem(dto)).toEqual(dto);
-      expect(mockStockService.createItem).toHaveBeenCalledWith(dto);
+      expect(await controller.createItemWithStock(dto, file)).toEqual(dto);
+      expect(mockStockService.createItemWithStock).toHaveBeenCalledWith(dto, file);
     });
 
     it('should throw an error if item creation fails', async () => {
-      const dto: CreateItemDto = {
+      const dto: CreateItemWithStockDto = {
         name: 'Laptop',
         barcode: 'L001',
         categoryId: 1,
         supplierId: 1,
+        reorderLevel: 5,
+        gradient: 'linear(#0ea5e9, #22d3ee)',
+        remark: 'Wireless mouse',
+        colorCode: '#000000',
+        quantity: 100,
+        unitPrice: 450.0,
+        sellPrice: 650.0,
       };
-      mockStockService.createItem.mockRejectedValue(new Error('Error'));
+      const file: Express.Multer.File = { buffer: Buffer.from('sample'), originalname: 'test.png' } as any;
+      mockStockService.createItemWithStock.mockRejectedValue(new Error('Error'));
 
-      await expect(controller.createItem(dto)).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.createItemWithStock(dto, file)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
 
@@ -92,7 +116,7 @@ describe('StockController', () => {
       };
       mockStockService.handlePurchaseRequest.mockResolvedValue(dto);
 
-      expect(await controller.handlePurchaseRequest(dto)).toEqual(dto);
+      expect(await controller.createStock(dto)).toEqual(dto);
       expect(mockStockService.handlePurchaseRequest).toHaveBeenCalledWith(dto);
     });
 
@@ -104,10 +128,13 @@ describe('StockController', () => {
         sellPrice: 15.0,
         supplierId: 1,
       };
-      mockStockService.handlePurchaseRequest.mockRejectedValue(new Error('Error'));
+      mockStockService.handlePurchaseRequest.mockRejectedValue(
+        new Error('Error'),
+      );
 
-      await expect(controller.handlePurchaseRequest(dto)).rejects.toThrow(InternalServerErrorException);
+      await expect(controller.createStock(dto)).rejects.toThrow(
+        InternalServerErrorException,
+      );
     });
   });
-
 });
