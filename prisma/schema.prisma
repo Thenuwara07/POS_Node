@@ -264,7 +264,7 @@ model ReportAudit {
 }
 
 model PriceRule {
-  id               String  @id
+  id               Int     @id @default(autoincrement())   // << was String @id
   name             String
   type             String
   scopeKind        String  @map("scope_kind")
