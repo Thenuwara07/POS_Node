@@ -649,4 +649,42 @@ async getSaleBundleList(
 
   // -------------------------------------------------------------------------------
 
+
+
+
+
+  // SELECT * FROM "drawer" WHERE user_id = ? ORDER BY date DESC
+  async getDrawerByUser(userId: number): Promise<Record<string, any>[]> {
+    const uid = Number(userId);
+    if (!Number.isInteger(uid) || uid <= 0) {
+      throw new BadRequestException('userId must be a positive integer');
+    }
+
+    try {
+      const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
+        SELECT * FROM "drawer"
+        WHERE user_id = ${uid}
+        ORDER BY date DESC
+      `);
+
+      // Ensure JSON-safe output (Postgres BIGINT -> number)
+      return rows.map((r) => {
+        const out: Record<string, any> = {};
+        for (const k of Object.keys(r)) {
+          const v = (r as any)[k];
+          out[k] = typeof v === 'bigint' ? Number(v) : v;
+        }
+        return out;
+      });
+    } catch {
+      // Parity with Flutter: swallow errors and return []
+      return [];
+    }
+  }
+
+
+
+
+
+  // -------------------------------------------------------------------------------------
 }

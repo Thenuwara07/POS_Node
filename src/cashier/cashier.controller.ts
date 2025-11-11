@@ -393,7 +393,25 @@ export class CashierController {
 
 
 
-
-
   // --------------------------------------------------------------------------------------------------------
+
+
+
+  // GET /cashier/drawers/user/:userId
+  @Get('drawers/user/:userId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'List drawer rows for a user, ordered by date DESC' })
+  @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiOkResponse({
+    description: 'Drawer rows returned (may be empty).',
+    schema: { type: 'array', items: { type: 'object', additionalProperties: true } },
+  })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async getDrawerByUser(@Param('userId', ParseIntPipe) userId: number) {
+    return this.cashierService.getDrawerByUser(userId);
+  }
+
 }
