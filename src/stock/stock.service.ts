@@ -17,6 +17,12 @@ import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
 import { Prisma } from '../../generated/prisma';
 import { RestockItemDto } from './dto/restock-item.dto';
+import { GetAllItemsDto } from './dto/get-all-items.dto';
+import { UpdateItemDto } from './dto/update-item.dto';
+import { RestockDto } from './dto/restock.dto';
+import { Prisma } from '@prisma/client';
+import { RestockItemDto } from './dto/restock-item.dto';
+import { GetLowStockDto } from './dto/get-low-stock.dto';
 
 @Injectable()
 export class StockService {
@@ -801,6 +807,72 @@ async restockItem(itemId: number, dto: RestockItemDto) {
 
 
 
+
+
+
+  // ---------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+
+
+  async listLowStockItems(): Promise<GetLowStockDto[]> {
+  this.logger.log('Listing low-stock items (qty <= reorderLevel; zero treated as 0)');
+
+  try {
+    // Pull required fields + all stock rows for quick in-memory aggregation.
+    const items = await this.prisma.item.findMany({
+      where: {
+        status: 1,              // only enabled items; remove if you want all
+        reorderLevel: { gt: 0 } // only items that actually have a threshold
+      },
+      select: {
+        id: true,
+        name: true,
+        reorderLevel: true,
+        supplier: { select: { name: true } },
+        stock: { select: { quantity: true } },
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+
+    // Aggregate qty per item, filter against reorderLevel, and shape DTOs.
+    const rows: GetLowStockDto[] = [];
+
+    for (const it of items) {
+      const qty = (it.stock ?? []).reduce((sum, s) => {
+        const n = Number(s.quantity);
+        return sum + (Number.isFinite(n) ? Math.trunc(n) : 0);
+      }, 0);
+
+      // Low-stock condition: qty <= reorderLevel
+      if (qty <= (it.reorderLevel ?? 0)) {
+        rows.push({
+          itemId: it.id,
+          name: it.name,
+          qty,
+          supplierName: it.supplier?.name ?? '(Unknown supplier)',
+        });
+      }
+    }
+
+    // Optional: sort by "how urgent" (lowest qty first, then highest reorderLevel)
+    rows.sort((a, b) => {
+      if (a.qty !== b.qty) return a.qty - b.qty;
+      return a.itemId - b.itemId;
+    });
+
+    this.logger.log(`Low-stock items found: ${rows.length}`);
+    return rows;
+  } catch (err) {
+    this.logger.error('Failed to list low-stock items', err instanceof Error ? err.stack : undefined);
+    this.handlePrismaError(err, 'listLowStockItems');
+  }
+}
 
 
 }
