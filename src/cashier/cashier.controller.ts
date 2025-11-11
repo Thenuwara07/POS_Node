@@ -5,9 +5,11 @@ import {
   Get,
   Logger,
   Param,
+  ParseBoolPipe,
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
   UsePipes,
   ValidationPipe,
@@ -29,6 +31,7 @@ import {
   ApiConflictResponse,
   ApiParam,
   ApiNotFoundResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
@@ -413,5 +416,48 @@ export class CashierController {
   async getDrawerByUser(@Param('userId', ParseIntPipe) userId: number) {
     return this.cashierService.getDrawerByUser(userId);
   }
+
+
+
+  // -----------------------------------------------------------------------------------------
+
+
+
+
+  // GET /cashier/drawers/user/:userId?todayOnly=true
+
+  @Get('drawers/user/:userId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'List drawer rows for a user, ordered by date DESC; optionally restrict to today (epoch-ms window).',
+  })
+  @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiQuery({ name: 'todayOnly', required: false, type: Boolean, example: false })
+  @ApiOkResponse({
+    description: 'Drawer rows returned (may be empty).',
+    schema: { type: 'array', items: { type: 'object', additionalProperties: true } },
+  })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async getDrawersByUserId(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('todayOnly', new ParseBoolPipe({ optional: true })) todayOnly?: boolean,
+  ) {
+    return this.cashierService.getDrawersByUserId(userId, !!todayOnly);
+  }
+
+
+
+
+
+
+  // ----------------------------------------------------------------------------------------------------
+
+
+  
+
 
 }

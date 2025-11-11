@@ -687,4 +687,63 @@ async getSaleBundleList(
 
 
   // -------------------------------------------------------------------------------------
+
+
+
+
+  // SELECT * FROM "drawer" WHERE user_id = ? [AND date range] ORDER BY date DESC
+  async getDrawersByUserId(
+    userId: number,
+    todayOnly = false,
+  ): Promise<Record<string, any>[]> {
+    const uid = Number(userId);
+    if (!Number.isInteger(uid) || uid <= 0) {
+      throw new BadRequestException('userId must be a positive integer');
+    }
+
+    // Optional "today" window (local server time) in epoch-ms
+    let startMs: number | null = null;
+    let endMs: number | null = null;
+    if (todayOnly) {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+      startMs = start.getTime();
+      endMs = end.getTime();
+    }
+
+    const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
+      todayOnly
+        ? Prisma.sql`
+            SELECT * FROM "drawer"
+            WHERE user_id = ${uid}
+              AND date >= ${Prisma.sql`${startMs}::bigint`}
+              AND date <  ${Prisma.sql`${endMs}::bigint`}
+            ORDER BY date DESC
+          `
+        : Prisma.sql`
+            SELECT * FROM "drawer"
+            WHERE user_id = ${uid}
+            ORDER BY date DESC
+          `,
+    );
+
+    // Convert any bigint fields to number for JSON safety
+    return rows.map((r) => {
+      const o: Record<string, any> = {};
+      for (const k of Object.keys(r)) {
+        const v = (r as any)[k];
+        o[k] = typeof v === 'bigint' ? Number(v) : v;
+        // If your drawer.date is BIGINT, it will now be a JS number.
+      }
+      return o;
+    });
+  }
+
+
+  // --------------------------------------------------------------------------
+
+
+  
+
 }
