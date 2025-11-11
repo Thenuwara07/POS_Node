@@ -31,6 +31,7 @@ import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
+import { CreateReturnDto } from './dto/create-return.dto';
 
 @ApiTags('Cashier')
 @Controller('cashier')
@@ -269,4 +270,41 @@ export class CashierController {
 
   // -------------------------------------------------------------------------------------------------
 
+
+
+
+  // POST /cashier/returns
+
+
+  @Post('returns')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Insert a return row (parity with Flutter insertReturn). Accepts snake_case or camelCase keys.',
+  })
+  @ApiBody({ type: CreateReturnDto })
+  @ApiCreatedResponse({
+    description: 'Return created.',
+    schema: { type: 'object', properties: { id: { type: 'number', example: 42 } } },
+  })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  @ApiConflictResponse({ description: 'Duplicate unique value (if any).' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async insertReturn(@Body() dto: CreateReturnDto): Promise<{ id: number }> {
+    return this.cashierService.insertReturn(dto);
+  }
+
+
+
+
+
+
+  // ----------------------------------------------------------------------------------------------------
+
+
+
+  
 }

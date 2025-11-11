@@ -9,6 +9,8 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentDiscountType, PaymentMethod, Prisma } from 'generated/prisma';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
+import { CreateReturnDto } from './dto/create-return.dto';
+import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 
 @Injectable()
 export class CashierService {
@@ -474,9 +476,88 @@ async getSaleBundleList(
 
 
 
+
+
+
+
+
   // ------------------------------------------------------------------------------------------------
 
 
+  // INSERT RETURN 
+
+
+  async insertReturn(dto: CreateReturnDto): Promise<{ id: number }> {
+    // ---- Coercions / validations (server-side, mirrors Flutter) ----
+    const userId = Number(dto.user_id);
+    const batchId = String(dto.batch_id ?? '').trim();
+    const itemId = Number(dto.item_id);
+    const quantity = Number(dto.quantity);
+    const unitSaledPrice = Number(dto.unit_saled_price);
+    const saleInvoiceId = String(dto.sale_invoice_id ?? '').trim();
+
+    // created_at: accept int millis or ISO-8601 string; otherwise now()
+    let createdAtMs: number;
+    const createdRaw = dto.created_at;
+    if (typeof createdRaw === 'number') {
+      createdAtMs = createdRaw;
+    } else if (typeof createdRaw === 'string') {
+      const parsed = Date.parse(createdRaw);
+      if (Number.isNaN(parsed)) {
+        throw new BadRequestException('created_at string is not a valid date');
+      }
+      createdAtMs = parsed;
+    } else {
+      createdAtMs = Date.now();
+    }
+
+    if (!Number.isFinite(userId) || userId <= 0) {
+      throw new BadRequestException('user_id is required and must be > 0');
+    }
+    if (!batchId) throw new BadRequestException('batch_id is required and must be non-empty');
+    if (!Number.isFinite(itemId) || itemId <= 0) {
+      throw new BadRequestException('item_id is required and must be > 0');
+    }
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      throw new BadRequestException('quantity must be >= 1');
+    }
+    if (!Number.isFinite(unitSaledPrice) || unitSaledPrice < 0) {
+      throw new BadRequestException('unit_saled_price must be >= 0');
+    }
+    if (!saleInvoiceId) {
+      throw new BadRequestException('sale_invoice_id is required and must be non-empty');
+    }
+
+    // ---- Insert using raw SQL (no Prisma model for "return") ----
+    try {
+      const castBigInt = Prisma.sql`${createdAtMs}::bigint`;
+      const rows = await this.prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
+        INSERT INTO "return" 
+          ("user_id","batch_id","item_id","quantity","unit_saled_price","sale_invoice_id","created_at")
+        VALUES 
+          (${userId}, ${batchId}, ${itemId}, ${quantity}, ${unitSaledPrice}, ${saleInvoiceId}, ${castBigInt})
+        RETURNING id
+      `);
+
+      const created = rows?.[0];
+      if (!created || typeof created.id !== 'number') {
+        throw new InternalServerErrorException('Return insert did not yield an id');
+      }
+      return { id: created.id };
+    } catch (err: any) {
+      // Prisma error mapping (raw queries may not always carry codes, but handle known cases)
+      const code = (err as PrismaClientKnownRequestError)?.code;
+      if (code === 'P2003') {
+        // FK violation (e.g., user_id/item_id/sale_invoice_id not matching)
+        throw new BadRequestException('Invalid relation (FK) while inserting return');
+      }
+      if (code === 'P2002') {
+        // unique violation (if any unique constraints exist on the table)
+        throw new ConflictException('Duplicate value for unique field on return');
+      }
+      throw new InternalServerErrorException('Failed to insert return');
+    }
+  }
 
 
 }
