@@ -8,6 +8,7 @@ import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { PaymentDiscountType, PaymentMethod, Prisma } from 'generated/prisma';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
+import { ReturnRichDto } from './dto/return-rich.dto';
 
 @Injectable()
 export class CashierService {
@@ -290,7 +291,7 @@ async getAllReturns(): Promise<Record<string, any>[]> {
 
 
 
-
+// Get Sale Bundle List
 
 
 async getSaleBundleList(
@@ -391,5 +392,91 @@ async getSaleBundleList(
     // 3) header first, then lines
     return [header, ...lineMaps];
   }
+
+
+
+
+  // ---------------------------------------------------------------------------------
+
+
+
+
+  // -------------------- returns (rich) --------------------
+  
+  
+  
+  
+  async getReturnsRich(): Promise<ReturnRichDto[]> {
+    try {
+      const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
+        SELECT
+          r.id            AS return_id,
+          r.batch_id      AS batch_id,
+          r.quantity      AS quantity,
+          r.unit_saled_price AS unit_saled_price,
+          r.sale_invoice_id  AS sale_invoice_id,
+          r.created_at    AS created_at,
+
+          u.id            AS user_id,
+          u.name          AS user_name,
+          u.email         AS user_email,
+          u.color_code    AS user_color_code,
+
+          i.id            AS item_id,
+          i.name          AS item_name,
+          i.barcode       AS item_barcode,
+          i.color_code    AS item_color_code
+        FROM "return" r
+        JOIN "user"  u ON u.id = r.user_id
+        JOIN "item"  i ON i.id = r.item_id
+        ORDER BY r.created_at DESC, r.id DESC
+      `);
+
+      const out: ReturnRichDto[] = rows.map((row) => {
+        // created_at might be BIGINT/number/string -> coerce to number for Flutter
+        const createdAt =
+          typeof row.created_at === 'bigint'
+            ? Number(row.created_at)
+            : typeof row.created_at === 'string'
+            ? Number(row.created_at)
+            : (row.created_at as number);
+
+        return {
+          id: Number(row.return_id),
+          user: {
+            id: Number(row.user_id),
+            name: String(row.user_name),
+            email: String(row.user_email),
+            color_code: String(row.user_color_code),
+          },
+          batch_id: String(row.batch_id),
+          item: {
+            id: Number(row.item_id),
+            name: String(row.item_name),
+            barcode: row.item_barcode == null ? null : String(row.item_barcode),
+            color_code: String(row.item_color_code),
+          },
+          quantity: Number(row.quantity),
+          unit_saled_price: Number(row.unit_saled_price),
+          sale_invoice_id:
+            row.sale_invoice_id == null ? null : String(row.sale_invoice_id),
+          created_at: createdAt,
+        };
+      });
+
+      return out;
+    } catch (err) {
+      // You can branch on Prisma error codes if needed:
+      // if ((err as PrismaClientKnownRequestError).code === 'PXXXX') { ... }
+      throw new InternalServerErrorException('Failed to fetch returns (rich).');
+    }
+  }
+
+
+
+  // ------------------------------------------------------------------------------------------------
+
+
+
 
 }

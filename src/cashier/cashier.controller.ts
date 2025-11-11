@@ -30,6 +30,7 @@ import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
+import { ReturnRichDto } from './dto/return-rich.dto';
 
 @ApiTags('Cashier')
 @Controller('cashier')
@@ -240,5 +241,32 @@ export class CashierController {
 
 
 
+
+// --------------------  GET /cashier/returns/rich --------------------
+
+
+  @Get('returns/rich')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Get returns with joined user & item (Flutter parity shape of getReturnsRich).',
+  })
+  @ApiOkResponse({
+    description: 'Returns (rich) fetched.',
+    type: ReturnRichDto,
+    isArray: true,
+  })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async getReturnsRich(): Promise<ReturnRichDto[]> {
+    return this.cashierService.getReturnsRich();
+  }
+
+  
+
+
+  // -------------------------------------------------------------------------------------------------
 
 }
