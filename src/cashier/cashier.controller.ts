@@ -43,6 +43,8 @@ import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
 import { DrawersQueryDto } from './dto/drawers-query.dto';
 import { AddDrawerEntryDto } from './dto/add-drawer-entry.dto';
 import { StockApplyResultDto, UpdateStockFromInvoicesPayloadDto } from './dto/stock-apply.dto';
+import { QueryDrawersDto } from './dto/query-drawers.dto';
+import { InsertDrawerDto } from './dto/insert-drawer.dto';
 
 @ApiTags('Cashier')
 @Controller('cashier')
@@ -608,9 +610,61 @@ export class CashierController {
 
 
 
+// POST /cashier/drawers  (INSERT)
+  @Post('drawers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Insert drawer row (flexible keys, epoch/ISO date)' })
+  @ApiCreatedResponse({ schema: { type: 'object', properties: { id: { type: 'number', example: 123 } } } })
+  @ApiBadRequestResponse({ description: 'Validation error' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async insertDrawer(@Body() dto: InsertDrawerDto) {
+    return this.cashierService.insertDrawer(dto);
+  }
+
+  // GET /cashier/drawers  (ALL with filters)
+  @Get('drawers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'List drawers with optional filters (userId, type, dateFromMillis, dateToMillis) and pagination',
+  })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({ name: 'userId', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false, type: String })
+  @ApiQuery({ name: 'dateFromMillis', required: false, type: Number })
+  @ApiQuery({ name: 'dateToMillis', required: false, type: Number })
+  @ApiQuery({
+    name: 'orderBy',
+    required: false,
+    enum: ['date_desc_id_desc', 'date_asc_id_asc'],
+  })
+  @ApiOkResponse({
+    description: 'Drawer rows',
+    schema: { type: 'array', items: { type: 'object', additionalProperties: true } },
+  })
+  async getAllDrawers(@Query() q: QueryDrawersDto) {
+    return this.cashierService.getAllDrawers(q);
+  }
+
+  // GET /cashier/drawers/:id  (BY ID)
+  @Get('drawers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get drawer by id (returns object or null)' })
+  @ApiParam({ name: 'id', type: Number, example: 42 })
+  @ApiOkResponse({ description: 'Row or null', schema: { oneOf: [{ type: 'object' }, { type: 'null' }] } })
+  async getDrawerById(@Param('id', ParseIntPipe) id: number) {
+    return this.cashierService.getDrawerById(id);
+  }
 
 
-  
 
 
 }

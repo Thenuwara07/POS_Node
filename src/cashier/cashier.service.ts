@@ -6,15 +6,18 @@ import { ItemDto } from './dto/item.dto';
 import { BatchDto } from './dto/batch.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { PaymentDiscountType, PaymentMethod, Prisma } from 'generated/prisma';
+import { PaymentDiscountType, PaymentMethod } from '@prisma/client';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
-import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
 import { DrawerOrderKey } from './dto/drawers-query.dto';
 import { AddDrawerEntryDto, DrawerType } from './dto/add-drawer-entry.dto';
 import { StockApplyMissingDto, StockApplyResultDto, StockApplyUpdatedDto, StockApplyWarnDto, UpdateStockFromInvoicesPayloadDto } from './dto/stock-apply.dto';
+import { QueryDrawersDto } from './dto/query-drawers.dto';
+import { InsertDrawerDto } from './dto/insert-drawer.dto';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CashierService {
@@ -1077,5 +1080,123 @@ async getSaleBundleList(
 
   // -----------------------------------------------------------------------------------------------------------------
 
+
+
+
+
+  // ---------- INSERT ----------
+  async insertDrawer(dto: InsertDrawerDto): Promise<{ id: number }> {
+    const amount = Number(dto.amount);
+    const reason = String(dto.reason ?? '').trim();
+    const type = String(dto.type ?? '').trim();
+    const userId = Number(dto.user_id);
+
+    // date: epoch ms or ISO; default now()
+    let whenMs: number;
+    if (typeof dto.date === 'number') {
+      whenMs = dto.date;
+    } else if (typeof dto.date === 'string' && dto.date.trim().length > 0) {
+      const parsed = Date.parse(dto.date);
+      if (Number.isNaN(parsed)) throw new BadRequestException('Invalid date string');
+      whenMs = parsed;
+    } else {
+      whenMs = Date.now();
+    }
+
+    if (!Number.isFinite(amount)) throw new BadRequestException('amount must be a finite number');
+    if (!reason) throw new BadRequestException('reason is required and must be non-empty');
+    if (!type) throw new BadRequestException('type is required and must be non-empty');
+    if (!Number.isInteger(userId) || userId <= 0)
+      throw new BadRequestException('user_id is required and must be > 0');
+
+    try {
+      const rows = await this.prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
+        INSERT INTO "drawer" ("amount","date","reason","type","user_id")
+        VALUES (${amount}, ${Prisma.sql`${whenMs}::bigint`}, ${reason}, ${type}, ${userId})
+        RETURNING id
+      `);
+      const created = rows?.[0];
+      if (!created) throw new InternalServerErrorException('Insert failed');
+      return { id: created.id };
+    } catch {
+      // Likely FK error for user_id, etc.
+      throw new InternalServerErrorException('Failed to insert drawer row');
+    }
+  }
+
+  // ---------- GET ALL (with optional filters) ----------
+  async getAllDrawers(q: QueryDrawersDto): Promise<Record<string, any>[]> {
+    const parts: Prisma.Sql[] = [];
+    const whereClauses: Prisma.Sql[] = [];
+
+    if (q.userId) whereClauses.push(Prisma.sql`user_id = ${q.userId}`);
+    if (q.type) whereClauses.push(Prisma.sql`type = ${q.type}`);
+    if (q.dateFromMillis) whereClauses.push(Prisma.sql`date >= ${Prisma.sql`${q.dateFromMillis}::bigint`}`);
+    if (q.dateToMillis) whereClauses.push(Prisma.sql`date <= ${Prisma.sql`${q.dateToMillis}::bigint`}`);
+
+    const whereSql =
+  whereClauses.length > 0
+    ? Prisma.sql`WHERE ${Prisma.join(whereClauses, ' AND ')}`
+    : Prisma.empty;
+
+
+    const orderSql: Prisma.Sql =
+      (q.orderBy ?? 'date_desc_id_desc') === 'date_asc_id_asc'
+        ? Prisma.sql`ORDER BY date ASC, id ASC`
+        : Prisma.sql`ORDER BY date DESC, id DESC`;
+
+    const base = Prisma.sql`
+      SELECT * FROM "drawer"
+      ${whereSql}
+      ${orderSql}
+    `;
+
+    let rows: Array<Record<string, any>>;
+    if (q.limit != null && q.offset != null) {
+      rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
+        Prisma.sql`${base} LIMIT ${q.limit} OFFSET ${q.offset}`,
+      );
+    } else if (q.limit != null) {
+      rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
+        Prisma.sql`${base} LIMIT ${q.limit}`,
+      );
+    } else {
+      rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(base);
+    }
+
+    // normalize bigint -> number
+    return rows.map((r) => {
+      const o: Record<string, any> = {};
+      for (const k of Object.keys(r)) {
+        const v = (r as any)[k];
+        o[k] = typeof v === 'bigint' ? Number(v) : v;
+      }
+      return o;
+    });
+  }
+
+  // ---------- GET BY ROW ID ----------
+  async getDrawerById(id: number): Promise<Record<string, any> | null> {
+    const rid = Number(id);
+    if (!Number.isInteger(rid) || rid <= 0) throw new BadRequestException('id must be > 0');
+
+    const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
+      SELECT * FROM "drawer" WHERE id = ${rid} LIMIT 1
+    `);
+    if (!rows?.length) return null;
+
+    const r = rows[0];
+    const out: Record<string, any> = {};
+    for (const k of Object.keys(r)) {
+      const v = (r as any)[k];
+      out[k] = typeof v === 'bigint' ? Number(v) : v;
+    }
+    return out;
+  }
+
+
+
+
+  
 
 }
