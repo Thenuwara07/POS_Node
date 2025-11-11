@@ -17,10 +17,10 @@ function daysToString(days?: number[]): string | null | undefined {
   return days.sort((a, b) => a - b).join(',');
 }
 
-/** serializes scopeValue:
+/** Serialize scopeValue:
  *  - ALL => ''
  *  - ITEM/CATEGORY => '1,2,3'
- *  - BUY_X_GET_Y => JSON string if first element is object
+ *  - BUY_X_GET_Y => JSON string if object
  */
 function serializeScopeValue(
   dto: CreatePromotionDto | UpdatePromotionDto,
@@ -42,10 +42,9 @@ export class PromotionService {
     const now = BigInt(Date.now());
     return this.prisma.priceRule.create({
       data: {
-        id: crypto.randomUUID(),
         name: dto.name,
-        type: dto.type, // string column in DB
-        scopeKind: dto.scopeKind, // string column in DB
+        type: dto.type,
+        scopeKind: dto.scopeKind,
         scopeValue: serializeScopeValue(dto) ?? '',
         value: Number(dto.value ?? 0),
         stackable: b2i(dto.stackable) ?? 1,
@@ -100,13 +99,13 @@ export class PromotionService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: number) {
     const rule = await this.prisma.priceRule.findUnique({ where: { id } });
     if (!rule) throw new NotFoundException('Promotion not found');
     return rule;
   }
 
-  async update(id: string, dto: UpdatePromotionDto) {
+  async update(id: number, dto: UpdatePromotionDto) {
     await this.ensure(id);
     const now = BigInt(Date.now());
 
@@ -139,7 +138,7 @@ export class PromotionService {
     });
   }
 
-  async toggleActive(id: string, active: boolean) {
+  async toggleActive(id: number, active: boolean) {
     await this.ensure(id);
     return this.prisma.priceRule.update({
       where: { id },
@@ -147,13 +146,13 @@ export class PromotionService {
     });
   }
 
-  async remove(id: string) {
+  async remove(id: number) {
     await this.ensure(id);
     await this.prisma.priceRule.delete({ where: { id } });
     return { id, deleted: true };
   }
 
-  private async ensure(id: string) {
+  private async ensure(id: number) {
     const found = await this.prisma.priceRule.findUnique({ where: { id } });
     if (!found) throw new NotFoundException('Promotion not found');
   }
