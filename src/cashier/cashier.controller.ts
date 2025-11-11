@@ -1,9 +1,11 @@
 import {
     Body,
   Controller,
+  Delete,
   Get,
   Logger,
   Param,
+  ParseIntPipe,
   Post,
   UseGuards,
   UsePipes,
@@ -25,6 +27,7 @@ import {
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiParam,
+  ApiNotFoundResponse,
 } from '@nestjs/swagger';
 import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
@@ -306,5 +309,22 @@ export class CashierController {
 
 
 
-  
+  // Delete Return By Id
+
+  @Delete('returns/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete a return row by id' })
+  @ApiParam({ name: 'id', type: Number, example: 42 })
+  @ApiOkResponse({
+    description: 'Delete success.',
+    schema: { type: 'object', properties: { deleted: { type: 'number', example: 1 } } },
+  })
+  @ApiNotFoundResponse({ description: 'Return not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async deleteReturn(@Param('id', ParseIntPipe) id: number) {
+    return this.cashierService.deleteReturn(id);
+  }
 }

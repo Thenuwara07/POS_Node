@@ -560,4 +560,44 @@ async getSaleBundleList(
   }
 
 
+
+
+
+
+  // ----------------------------------------------------------------------------------------
+
+
+
+  // DELETE FROM "return" WHERE id = :id
+   
+  
+  async deleteReturn(id: number): Promise<{ deleted: number }> {
+    const rid = Number(id);
+    if (!Number.isInteger(rid) || rid <= 0) {
+      throw new BadRequestException('id must be a positive integer');
+    }
+
+    try {
+      // In Postgres, $executeRaw returns the number of affected rows.
+      const affected = await this.prisma.$executeRaw(
+        Prisma.sql`DELETE FROM "return" WHERE id = ${rid}`
+      );
+
+      if (!affected) {
+        throw new NotFoundException(`Return id=${rid} not found`);
+      }
+      return { deleted: affected }; // typically 1
+    } catch (err) {
+      throw new InternalServerErrorException('Failed to delete return');
+    }
+  }
+
+
+
+  // --------------------------------------------------------------------------------------------------
+
+
+
+  
+
 }
