@@ -626,4 +626,27 @@ async getSaleBundleList(
   }
   
 
+
+
+
+
+  // --------------------------------------------------------------------------------
+
+
+
+  // DELETE FROM "return";  -> returns how many rows were removed
+  async clearAllReturns(): Promise<{ deleted: number }> {
+    try {
+      const affected = await this.prisma.$executeRaw(
+        Prisma.sql`DELETE FROM "return"`
+      );
+      return { deleted: affected }; // e.g., 0..N
+    } catch {
+      throw new InternalServerErrorException('Failed to clear returns');
+    }
+  }
+
+
+  // -------------------------------------------------------------------------------
+
 }

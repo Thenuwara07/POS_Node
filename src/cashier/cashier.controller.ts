@@ -370,5 +370,30 @@ export class CashierController {
 
 
 
-  
+
+
+
+  // DELETE /cashier/returns -> clears the whole table
+  @Delete('returns')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER') // typically restrict to MANAGER; adjust if CASHIER may do this
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete ALL rows from the return table' })
+  @ApiOkResponse({
+    description: 'All returns cleared.',
+    schema: { type: 'object', properties: { deleted: { type: 'number', example: 12 } } },
+  })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async clearAllReturns() {
+    return this.cashierService.clearAllReturns();
+  }
+
+
+
+
+
+
+
+  // --------------------------------------------------------------------------------------------------------
 }
