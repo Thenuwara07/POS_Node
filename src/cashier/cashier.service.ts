@@ -11,6 +11,7 @@ import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library';
+import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
 
 @Injectable()
 export class CashierService {
@@ -598,6 +599,31 @@ async getSaleBundleList(
 
 
 
+  
+
+  // PATCH "return".is_done by id
+  async toggleReturnDone(id: number, dto: UpdateReturnDoneDto): Promise<{ updated: number }> {
+    const rid = Number(id);
+    if (!Number.isInteger(rid) || rid <= 0) {
+      throw new BadRequestException('id must be a positive integer');
+    }
+
+    // Convert boolean -> 0/1 to match your schema
+    const flag = dto.is_done ? 1 : 0;
+
+    try {
+      const affected = await this.prisma.$executeRaw(
+        Prisma.sql`UPDATE "return" SET is_done = ${flag} WHERE id = ${rid}`
+      );
+
+      if (!affected) {
+        throw new NotFoundException(`Return id=${rid} not found`);
+      }
+      return { updated: affected }; // typically 1
+    } catch (err) {
+      throw new InternalServerErrorException('Failed to update is_done');
+    }
+  }
   
 
 }

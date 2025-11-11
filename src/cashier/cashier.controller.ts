@@ -6,6 +6,7 @@ import {
   Logger,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   UseGuards,
   UsePipes,
@@ -35,6 +36,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
+import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
 
 @ApiTags('Cashier')
 @Controller('cashier')
@@ -327,4 +329,46 @@ export class CashierController {
   async deleteReturn(@Param('id', ParseIntPipe) id: number) {
     return this.cashierService.deleteReturn(id);
   }
+
+
+
+
+
+  // ------------------------------------------------------------------------------------------
+
+
+
+
+  // PATCH /cashier/returns/:id/done
+  @Patch('returns/:id/done')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Toggle is_done for a return row (0/1) by id' })
+  @ApiParam({ name: 'id', type: Number, example: 42 })
+  @ApiOkResponse({
+    description: 'Update success.',
+    schema: { type: 'object', properties: { updated: { type: 'number', example: 1 } } },
+  })
+  @ApiNotFoundResponse({ description: 'Return not found.' })
+  @ApiBadRequestResponse({ description: 'Validation error.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async toggleDone(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateReturnDoneDto,
+  ) {
+    return this.cashierService.toggleReturnDone(id, body);
+    // Body supports { "is_done": true } or { "isDone": true }
+  }
+
+
+
+
+
+  // ---------------------------------------------------------------------------------------------------
+
+
+
+  
 }
