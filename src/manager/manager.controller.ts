@@ -170,4 +170,177 @@ export class ManagerController {
       throw new InternalServerErrorException('Failed to fetch audit logs');
     }
   }
+
+  //--- Reports ----
+  //--- Items Details ----
+  @Get('items')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get items list' })
+  @ApiOkResponse({ description: 'Items fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllItems() {
+    try {
+      return await this.managerService.findAllItems();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch items', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch items');
+    }
+  }
+
+  //----Customers Details ----
+  @Get('customers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get customers list' })
+  @ApiOkResponse({ description: 'Customers fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllCustomers() {
+    try {
+      return await this.managerService.findAllCustomers();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch customers', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch customers');
+    }
+}
+
+  //--- User Details ----
+  @Get('users')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get users list' })
+  @ApiOkResponse({ description: 'Users fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllUsers() {
+    try {
+      return await this.managerService.findAllUsers();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch users', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch users');
+    }
+}
+
+ //-- Suplaier Details ----
+  @Get('suppliers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get suppliers list' })
+  @ApiOkResponse({ description: 'Suppliers fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllSuppliers() {
+    try {
+      return await this.managerService.findAllSuppliers();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch suppliers', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch suppliers');
+    }
+}
+
+  //---Stock Details ----
+  @Get('stocks')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get stock list' })
+  @ApiOkResponse({ description: 'Stocks fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllStocks() {
+    try {
+      return await this.managerService.findAllStocks();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch stocks', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch stocks');
+    }
+  }
+
+  //Invoice Details ----
+  @Get('invoices')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get invoice list' })
+  @ApiOkResponse({ description: 'Invoices fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllInvoices() {
+    try {
+      return await this.managerService.findAllInvoices();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch invoices', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch invoices');
+    }
+  }
+
+  //Card Payment Details ----
+  @Get('card-payments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get card payment list' })
+  @ApiOkResponse({ description: 'Card payments fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllCardPayments() {
+    try {
+      return await this.managerService.findAllCardPayments();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch card payments', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch card payments');
+    }
+  }
+
+  //Cash Payment Details ----
+  @Get('cash-payments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')  
+  @ApiOperation({ summary: 'Get cash payment list' })
+  @ApiOkResponse({ description: 'Cash payments fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllCashPayments() {
+    try {
+      return await this.managerService.findAllCashPayments();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch cash payments', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch cash payments');
+    }
+  }
+
+  //Daily sales report ----
+  @Get('daily-sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('MANAGER')
+  @ApiBearerAuth('JWT-auth')  
+  @ApiOperation({ summary: 'Get daily sales report' })
+  @ApiOkResponse({ description: 'Daily sales report fetched.' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
+  async findAllDailySales() {
+    try {
+      return await this.managerService.findAllDailySales();
+    } catch (err: any) {
+      this.logger.error('Failed to fetch daily sales', err?.stack || err);
+      throw new InternalServerErrorException('Failed to fetch daily sales');
+    }
+  }
+
 }
