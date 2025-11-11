@@ -15,14 +15,9 @@ import { ImageStorageService } from '../common/upload/image-storage.service';
 import { GetAllItemsDto } from './dto/get-all-items.dto';
 import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
-import { Prisma } from '../../generated/prisma';
-import { RestockItemDto } from './dto/restock-item.dto';
-import { GetAllItemsDto } from './dto/get-all-items.dto';
-import { UpdateItemDto } from './dto/update-item.dto';
-import { RestockDto } from './dto/restock.dto';
-import { Prisma } from '@prisma/client';
 import { RestockItemDto } from './dto/restock-item.dto';
 import { GetLowStockDto } from './dto/get-low-stock.dto';
+import { Prisma } from '../../generated/prisma-client';
 
 @Injectable()
 export class StockService {
