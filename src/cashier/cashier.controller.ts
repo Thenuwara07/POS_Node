@@ -40,6 +40,9 @@ import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
+import { DrawersQueryDto } from './dto/drawers-query.dto';
+import { AddDrawerEntryDto } from './dto/add-drawer-entry.dto';
+import { StockApplyResultDto, UpdateStockFromInvoicesPayloadDto } from './dto/stock-apply.dto';
 
 @ApiTags('Cashier')
 @Controller('cashier')
@@ -455,6 +458,156 @@ export class CashierController {
 
 
   // ----------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+  // GET /cashier/drawers/user/:userId/exists?todayOnly=true
+  @Get('drawers/user/:userId/exists')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Return { has: boolean } if user has drawer rows (optional todayOnly)' })
+  @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiQuery({ name: 'todayOnly', required: false, type: Boolean, example: false })
+  @ApiOkResponse({ schema: { type: 'object', properties: { has: { type: 'boolean', example: true } } } })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async hasDrawersByUserId(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query('todayOnly', new ParseBoolPipe({ optional: true })) todayOnly?: boolean,
+  ) {
+    return this.cashierService.hasDrawersByUserId(userId, !!todayOnly);
+  }
+
+
+
+
+  // -----------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+  // POST /cashier/drawers
+  @Post('drawers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Insert a drawer entry (amount/date/reason/type/user_id)' })
+  @ApiCreatedResponse({ schema: { type: 'object', properties: { id: { type: 'number', example: 123 } } } })
+  @ApiBadRequestResponse({ description: 'Validation error' })
+  async addDrawerEntry(@Body() dto: AddDrawerEntryDto) {
+    return this.cashierService.addDrawerEntry(dto);
+  }
+
+
+
+
+
+
+  // ----------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+  // GET /cashier/shops/latest
+  @Get('shops/latest')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER') // adjust as needed
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get latest shop row by id DESC (or null if none)' })
+  @ApiOkResponse({ description: 'Shop row or null', schema: { oneOf: [{ type: 'object' }, { type: 'null' }] } })
+  async getLatestShopById() {
+    return this.cashierService.getLatestShopById();
+  }
+
+
+
+
+
+  // ------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
+  // GET /cashier/drawers/user/:userId/list?limit=&offset=&orderBy=
+  @Get('drawers/user/:userId/list')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'List drawers by user with pagination. orderBy: date_desc_id_desc (default) | date_asc_id_asc',
+  })
+  @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiOkResponse({
+    description: 'Drawer rows',
+    schema: { type: 'array', items: { type: 'object', additionalProperties: true } },
+  })
+  async getDrawersByUserIdPaged(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query() q: DrawersQueryDto,
+  ) {
+    return this.cashierService.getDrawersByUserIdPaged(
+      userId,
+      q.limit,
+      q.offset,
+      q.orderBy ?? 'date_desc_id_desc',
+    );
+  }
+
+
+
+
+
+  // ---------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+  // POST /cashier/stock/apply-from-invoices?allOrNothing=true
+  @Post('stock/apply-from-invoices')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Apply stock deductions from invoice lines. Set allOrNothing=true to rollback if any line fails.',
+  })
+  @ApiQuery({ name: 'allOrNothing', required: false, type: Boolean, example: false })
+  @ApiBody({ type: UpdateStockFromInvoicesPayloadDto })
+  @ApiOkResponse({ type: StockApplyResultDto })
+  @ApiBadRequestResponse({ description: 'Validation error' })
+  @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  async updateStockFromInvoicesPayload(
+    @Body() payload: UpdateStockFromInvoicesPayloadDto,
+    @Query('allOrNothing') allOrNothing?: string,
+  ): Promise<StockApplyResultDto> {
+    const aon =
+      typeof allOrNothing === 'string'
+        ? allOrNothing.toLowerCase() === 'true'
+        : false;
+    return this.cashierService.updateStockFromInvoicesPayload(payload, aon);
+  }
+
+
+
+
+  // ------------------------------------------------------------------------------------------------
+
+
+
 
 
   
