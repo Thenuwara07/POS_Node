@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserCredentialsDto } from '../dto/user-management.dto';
 import { UpdateCustomerNameDto } from '../dto/update-customer-name.dto';
-import * as bcrypt from 'bcryptjs';
+import * as bcrypt from 'bcrypt';
 import { Role } from '../../../generated/prisma-client';
 
 @Injectable()
@@ -31,8 +31,8 @@ export class ManagerAccountsService {
       throw new ForbiddenException('Only ADMIN or MANAGER can perform this action.');
     }
 
-    if (!dto.newName && !dto.newPassword) {
-      throw new BadRequestException('Provide at least one of newName or newPassword.');
+    if (!dto.newName && !dto.newPassword && !dto.newEmail) {
+      throw new BadRequestException('Provide at least one of newName, newEmail or newPassword.');
     }
 
     const user = await this.prisma.user.findUnique({ where: { id: dto.userId } });
@@ -43,6 +43,17 @@ export class ManagerAccountsService {
     };
 
     if (dto.newName) data.name = dto.newName;
+    if (dto.newEmail) {
+      const normalizedEmail = dto.newEmail.trim().toLowerCase();
+      const existingEmail = await this.prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true },
+      });
+      if (existingEmail && existingEmail.id !== dto.userId) {
+        throw new BadRequestException('Email already in use.');
+      }
+      data.email = normalizedEmail;
+    }
 
     if (dto.newPassword) {
       const salt = await bcrypt.genSalt(10);
