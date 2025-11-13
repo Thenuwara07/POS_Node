@@ -75,6 +75,7 @@ model User {
   categoriesCreated Category[]    @relation("category_created_by")
   creditorsCreated  Creditor[]    @relation("creditor_created_by")
   creditorsUpdated  Creditor[]    @relation("creditor_updated_by")
+  authLogs          AuthLog[]
 
   @@map("user")
 }
@@ -315,4 +316,24 @@ model Creditor {
   @@index([createdById])
   @@index([updatedById])
   @@map("creditor")
+}
+enum AuthAction {
+  LOGIN
+  LOGOUT
+}
+
+model AuthLog {
+  id         Int        @id @default(autoincrement())
+  userId     Int?       @map("user_id")
+  email      String?
+  action     AuthAction
+  timestamp  BigInt     @map("ts")
+  ip         String?
+  userAgent  String?    @map("user_agent")
+  meta       Json?
+
+  user       User?      @relation(fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+  @@map("auth_log")
 }

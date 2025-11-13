@@ -38,6 +38,7 @@ import { UpdateManagerDto } from './dto/update-manager.dto';
 import { CreateCreditorDto } from './dto/create-creditor.dto';
 import { UpdateCreditorDto } from './dto/update-creditor.dto';
 import { CreditorService } from './services/creditor.service';
+import { ManagerAuditLogsQueryDto } from './dto/manager-audit-logs-query.dto';
 
 @ApiTags('Manager')
 @Controller('manager')
@@ -168,14 +169,9 @@ export class ManagerController {
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'View audit logs' })
-  async getAuditLogs(
-    @Query('userId') userId?: number,
-    @Query('reportCode') reportCode?: string,
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
-  ) {
+  async getAuditLogs(@Query() query: ManagerAuditLogsQueryDto) {
     try {
-      return await this.managerService.getAuditLogs(userId, reportCode, limit, offset);
+      return await this.managerService.getAuditLogs(query);
     } catch (err: any) {
       this.logger.error('Failed to fetch audit logs', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch audit logs');

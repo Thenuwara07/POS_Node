@@ -11,7 +11,8 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { CreateManagerDto } from './dto/create-manager.dto';
 import { UpdateManagerDto } from './dto/update-manager.dto';
 import { hash, compare } from 'bcryptjs';
-import { Role } from '../../generated/prisma-client';
+import { Prisma, Role } from '../../generated/prisma-client';
+import { ManagerAuditLogsQueryDto } from './dto/manager-audit-logs-query.dto';
 
 
 @Injectable()
@@ -183,23 +184,35 @@ export class ManagerService {
   }
 
   // ✅ Get audit logs
-  async getAuditLogs(userId?: number, reportCode?: string, limit = 20, offset = 0) {
+  async getAuditLogs(query: ManagerAuditLogsQueryDto) {
     try {
-      const where: any = {};
-      if (userId) where.userId = Number(userId);
-      if (reportCode) where.reportCode = reportCode;
+      const limit = Math.min(200, Math.max(1, query.limit ?? 50));
+      const offset = Math.max(0, query.offset ?? 0);
 
-      const logs = await this.prisma.reportAudit.findMany({
-        where,
-        orderBy: { viewedAt: 'desc' },
-        take: limit,
-        skip: offset,
-        include: {
-          user: { select: { id: true, name: true, email: true, role: true } },
-        },
-      });
+      const andFilters: Prisma.AuthLogWhereInput[] = [];
+      if (query.fromTs) andFilters.push({ timestamp: { gte: BigInt(query.fromTs) } });
+      if (query.toTs) andFilters.push({ timestamp: { lte: BigInt(query.toTs) } });
 
-      return logs;
+      const where: Prisma.AuthLogWhereInput = {
+        ...(query.userId ? { userId: query.userId } : {}),
+        ...(query.action ? { action: query.action } : {}),
+        ...(andFilters.length ? { AND: andFilters } : {}),
+      };
+
+      const [items, total] = await this.prisma.$transaction([
+        this.prisma.authLog.findMany({
+          where,
+          orderBy: { timestamp: 'desc' },
+          skip: offset,
+          take: limit,
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
+        }),
+        this.prisma.authLog.count({ where }),
+      ]);
+
+      return { total, limit, offset, items };
     } catch (err) {
       this.handlePrismaError(err, 'getAuditLogs');
     }
