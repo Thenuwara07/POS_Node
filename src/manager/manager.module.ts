@@ -10,28 +10,35 @@ import { PromotionService } from './services/promotion.service';
 
 import { CreditorService } from './services/creditor.service';
 
-// NEW: Accounts controller & service
+// Accounts (existing)
 import { ManagerAccountsController } from './user-management.controller';
 import { ManagerAccountsService } from './services/manager-accounts.service';
+
+// --- Margins (NEW) ---
+import { ManagerMarginsController } from './margins.controller';
+import { MarginsService } from './services/margins.service';
 
 @Module({
   imports: [PrismaModule],
   controllers: [
-    ManagerController,          // existing manager endpoints
-    PromotionsController,       // promotions endpoints
-    ManagerAccountsController,  // NEW: /manager/accounts/*
+    ManagerController,
+    PromotionsController,
+    ManagerAccountsController,
+    ManagerMarginsController, // <-- NEW
   ],
   providers: [
     ManagerService,
     PromotionService,
     CreditorService,
-    ManagerAccountsService,     // NEW
+    ManagerAccountsService,
+    MarginsService,           // <-- NEW
   ],
   exports: [
     CreditorService,
     PromotionService,
     ManagerService,
-    ManagerAccountsService,     // NEW (export if other modules need it)
+    ManagerAccountsService,
+    MarginsService,           // <-- optional export
   ],
 })
 export class ManagerModule {}
