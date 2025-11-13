@@ -6,8 +6,8 @@ import { ItemDto } from './dto/item.dto';
 import { BatchDto } from './dto/batch.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { PaymentDiscountType, PaymentMethod } from '@prisma/client';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { PaymentDiscountType, PaymentMethod, Prisma } from '../../generated/prisma-client';
+import { PrismaClientKnownRequestError } from '../../generated/prisma-client/runtime/library';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
@@ -17,7 +17,6 @@ import { AddDrawerEntryDto, DrawerType } from './dto/add-drawer-entry.dto';
 import { StockApplyMissingDto, StockApplyResultDto, StockApplyUpdatedDto, StockApplyWarnDto, UpdateStockFromInvoicesPayloadDto } from './dto/stock-apply.dto';
 import { QueryDrawersDto } from './dto/query-drawers.dto';
 import { InsertDrawerDto } from './dto/insert-drawer.dto';
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class CashierService {
