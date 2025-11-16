@@ -13,9 +13,11 @@ import { Roles } from '../auth/roles.decorator';
 import { Role } from '../../generated/prisma-client';
 
 import { ReportsService } from './services/reports.service';
-import { ProfitMarginReportQueryDto } from './dto/profit-margin-report.dto';
+import { CreditSalesService } from './services/credit-sales.service';
 
-// 🔹 Swagger imports
+import { ProfitMarginReportQueryDto } from './dto/profit-margin-report.dto';
+import { CreditSalesReportQueryDto } from './dto/credit-sales-report.dto';
+
 import {
   ApiBearerAuth,
   ApiTags,
@@ -26,12 +28,15 @@ import {
 } from '@nestjs/swagger';
 
 @ApiTags('Manager Reports')
-@ApiBearerAuth('JWT-auth') // 👈 must match the name in addBearerAuth()
+@ApiBearerAuth('JWT-auth')
 @Controller('manager/reports')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles(Role.MANAGER)
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly creditSalesService: CreditSalesService,
+  ) {}
 
   @Get('profit-margin')
   @ApiOperation({ summary: 'Get profit & margin per invoice for a date range' })
@@ -46,6 +51,25 @@ export class ReportsController {
     const userId: number | undefined = user?.id ?? user?.sub;
 
     const data = await this.reportsService.getProfitMarginReport(query, userId);
+    return { data };
+  }
+
+  @Get('credit-sales')
+  @ApiOperation({ summary: 'Get credit sales for a date range' })
+  @ApiOkResponse({ description: 'Successfully returned credit sales list' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized (no / invalid token)' })
+  @ApiForbiddenResponse({ description: 'Forbidden (role is not MANAGER)' })
+  async getCreditSales(
+    @Query() query: CreditSalesReportQueryDto,
+    @Req() req: Request,
+  ) {
+    const user: any = (req as any).user;
+    const userId: number | undefined = user?.id ?? user?.sub;
+
+    const data = await this.creditSalesService.getCreditSalesReport(
+      query,
+      userId,
+    );
     return { data };
   }
 }
