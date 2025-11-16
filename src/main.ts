@@ -76,6 +76,7 @@ async function bootstrap() {
       },
       'JWT-auth', // 🔹 must match your @ApiBearerAuth('JWT-auth')
     )
+    .addSecurityRequirements('JWT-auth')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);

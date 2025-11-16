@@ -17,6 +17,11 @@ import { ManagerAccountsService } from './services/manager-accounts.service';
 // --- Margins (NEW) ---
 import { ManagerMarginsController } from './margins.controller';
 import { MarginsService } from './services/margins.service';
+import { ReportsController } from './reports.controller';
+import { ReportsService } from './services/reports.service';
+import { CreditSalesService } from './services/credit-sales.service';
+import { DiscountReportService } from './services/discount-report.service';
+import { UnpaidPurchasesService } from './services/unpaid-purchases.service';
 
 @Module({
   imports: [PrismaModule],
@@ -24,21 +29,30 @@ import { MarginsService } from './services/margins.service';
     ManagerController,
     PromotionsController,
     ManagerAccountsController,
-    ManagerMarginsController, // <-- NEW
+    ManagerMarginsController,
+    ReportsController, // <-- NEW
   ],
   providers: [
     ManagerService,
     PromotionService,
     CreditorService,
     ManagerAccountsService,
-    MarginsService,           // <-- NEW
+    MarginsService,  
+    ReportsService,
+    CreditSalesService,
+    DiscountReportService,
+    UnpaidPurchasesService,
   ],
   exports: [
     CreditorService,
     PromotionService,
     ManagerService,
     ManagerAccountsService,
-    MarginsService,           // <-- optional export
+    MarginsService,
+    ReportsService,
+    CreditSalesService,
+    DiscountReportService,
+    UnpaidPurchasesService,
   ],
 })
 export class ManagerModule {}

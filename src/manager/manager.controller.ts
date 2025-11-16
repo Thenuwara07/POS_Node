@@ -286,7 +286,7 @@ export class ManagerController {
   }
   //--- Reports ----
   //--- Items Details ----
-  @Get('items')
+  @Get('reports/items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
@@ -305,7 +305,7 @@ export class ManagerController {
   }
 
   //----Customers Details ----
-  @Get('customers')
+  @Get('reports/customers')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
@@ -324,7 +324,7 @@ export class ManagerController {
 }
 
   //--- User Details ----
-  @Get('users')
+  @Get('reports/users')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
@@ -343,7 +343,7 @@ export class ManagerController {
 }
 
  //-- Suplaier Details ----
-  @Get('suppliers')
+  @Get('reports/suppliers')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
@@ -362,7 +362,7 @@ export class ManagerController {
 }
 
   //---Stock Details ----
-  @Get('stocks')
+  @Get('reports/stocks')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
@@ -381,7 +381,7 @@ export class ManagerController {
   }
 
   //Invoice Details ----
-  @Get('invoices')
+  @Get('reports/invoices')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
@@ -400,7 +400,7 @@ export class ManagerController {
   }
 
   //Card Payment Details ----
-  @Get('card-payments')
+  @Get('reports/card-payments')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
@@ -419,7 +419,7 @@ export class ManagerController {
   }
 
   //Cash Payment Details ----
-  @Get('cash-payments')
+  @Get('reports/cash-payments')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')  
@@ -438,7 +438,7 @@ export class ManagerController {
   }
 
   //Daily sales report ----
-  @Get('daily-sales')
+  @Get('reports/daily-sales')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')  
