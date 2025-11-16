@@ -20,6 +20,8 @@ import { MarginsService } from './services/margins.service';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './services/reports.service';
 import { CreditSalesService } from './services/credit-sales.service';
+import { DiscountReportService } from './services/discount-report.service';
+import { UnpaidPurchasesService } from './services/unpaid-purchases.service';
 
 @Module({
   imports: [PrismaModule],
@@ -38,6 +40,8 @@ import { CreditSalesService } from './services/credit-sales.service';
     MarginsService,  
     ReportsService,
     CreditSalesService,
+    DiscountReportService,
+    UnpaidPurchasesService,
   ],
   exports: [
     CreditorService,
@@ -47,6 +51,8 @@ import { CreditSalesService } from './services/credit-sales.service';
     MarginsService,
     ReportsService,
     CreditSalesService,
+    DiscountReportService,
+    UnpaidPurchasesService,
   ],
 })
 export class ManagerModule {}

@@ -14,9 +14,13 @@ import { Role } from '../../generated/prisma-client';
 
 import { ReportsService } from './services/reports.service';
 import { CreditSalesService } from './services/credit-sales.service';
+import { DiscountReportService } from './services/discount-report.service';
+import { UnpaidPurchasesService } from './services/unpaid-purchases.service'; // 👈 NEW
 
 import { ProfitMarginReportQueryDto } from './dto/profit-margin-report.dto';
 import { CreditSalesReportQueryDto } from './dto/credit-sales-report.dto';
+import { DiscountReportQueryDto } from './dto/discount-report.dto';
+import { UnpaidPurchasesReportQueryDto } from './dto/unpaid-purchases-report.dto';
 
 import {
   ApiBearerAuth,
@@ -36,6 +40,8 @@ export class ReportsController {
   constructor(
     private readonly reportsService: ReportsService,
     private readonly creditSalesService: CreditSalesService,
+    private readonly discountReportService: DiscountReportService,
+    private readonly unpaidPurchasesService: UnpaidPurchasesService, // 👈 NEW
   ) {}
 
   @Get('profit-margin')
@@ -67,6 +73,44 @@ export class ReportsController {
     const userId: number | undefined = user?.id ?? user?.sub;
 
     const data = await this.creditSalesService.getCreditSalesReport(
+      query,
+      userId,
+    );
+    return { data };
+  }
+
+  @Get('discount-granted')
+  @ApiOperation({ summary: 'Get discount granted per invoice for a date range' })
+  @ApiOkResponse({ description: 'Successfully returned discount report list' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized (no / invalid token)' })
+  @ApiForbiddenResponse({ description: 'Forbidden (role is not MANAGER)' })
+  async getDiscountGranted(
+    @Query() query: DiscountReportQueryDto,
+    @Req() req: Request,
+  ) {
+    const user: any = (req as any).user;
+    const userId: number | undefined = user?.id ?? user?.sub;
+
+    const data = await this.discountReportService.getDiscountReport(
+      query,
+      userId,
+    );
+    return { data };
+  }
+
+  @Get('unpaid-purchases')
+  @ApiOperation({ summary: 'Get unpaid supplier purchases for a date range' })
+  @ApiOkResponse({ description: 'Successfully returned unpaid purchases list' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized (no / invalid token)' })
+  @ApiForbiddenResponse({ description: 'Forbidden (role is not MANAGER)' })
+  async getUnpaidPurchases(
+    @Query() query: UnpaidPurchasesReportQueryDto,
+    @Req() req: Request,
+  ) {
+    const user: any = (req as any).user;
+    const userId: number | undefined = user?.id ?? user?.sub;
+
+    const data = await this.unpaidPurchasesService.getUnpaidPurchasesReport(
       query,
       userId,
     );
