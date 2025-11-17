@@ -17,6 +17,9 @@ import { CreditSalesService } from "./services/credit-sales.service";
 import { DiscountReportService } from "./services/discount-report.service";
 import { UnpaidPurchasesService } from "./services/unpaid-purchases.service";
 import { TransactionHistoryService } from "./services/transaction-history.service";
+import { RefundBillsService } from './services/refund-bills.service';
+import { RefundBillsReportQueryDto } from './dto/refund-bills-report.dto';
+
 
 import { ProfitMarginReportQueryDto } from "./dto/profit-margin-report.dto";
 import { CreditSalesReportQueryDto } from "./dto/credit-sales-report.dto";
@@ -45,6 +48,7 @@ export class ReportsController {
     private readonly discountReportService: DiscountReportService,
     private readonly unpaidPurchasesService: UnpaidPurchasesService,
     private readonly transactionHistoryService: TransactionHistoryService,
+    private readonly refundBillsService: RefundBillsService,
   ) {}
 
   @Get("profit-margin")
@@ -139,4 +143,24 @@ export class ReportsController {
 
     return { data };
   }
+    @Get('refund-bills')
+  @ApiOperation({ summary: 'Get refund bills for a date range' })
+  @ApiOkResponse({ description: 'Successfully returned refund bills list' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized (no / invalid token)' })
+  @ApiForbiddenResponse({ description: 'Forbidden (role is not MANAGER)' })
+  async getRefundBills(
+    @Query() query: RefundBillsReportQueryDto,
+    @Req() req: Request,
+  ) {
+    const user: any = (req as any).user;
+    const userId: number | undefined = user?.id ?? user?.sub;
+
+    const data = await this.refundBillsService.getRefundBillsReport(
+      query,
+      userId,
+    );
+
+    return { data };
+  }
+
 }
