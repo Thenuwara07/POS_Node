@@ -22,6 +22,7 @@ import { ReportsService } from './services/reports.service';
 import { CreditSalesService } from './services/credit-sales.service';
 import { DiscountReportService } from './services/discount-report.service';
 import { UnpaidPurchasesService } from './services/unpaid-purchases.service';
+import { TransactionHistoryService } from './services/transaction-history.service';
 
 @Module({
   imports: [PrismaModule],
@@ -42,6 +43,7 @@ import { UnpaidPurchasesService } from './services/unpaid-purchases.service';
     CreditSalesService,
     DiscountReportService,
     UnpaidPurchasesService,
+    TransactionHistoryService,
   ],
   exports: [
     CreditorService,
@@ -53,6 +55,7 @@ import { UnpaidPurchasesService } from './services/unpaid-purchases.service';
     CreditSalesService,
     DiscountReportService,
     UnpaidPurchasesService,
+    TransactionHistoryService,
   ],
 })
 export class ManagerModule {}
