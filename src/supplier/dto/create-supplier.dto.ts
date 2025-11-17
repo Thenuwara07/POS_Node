@@ -1,71 +1,44 @@
-// src/suppliers/dto/create-supplier.dto.ts
-import {
-  IsString,
-  IsNotEmpty,
-  IsOptional,
-  IsEnum,
-  IsEmail,
-  IsBoolean,
-  IsHexColor,
-  IsArray,
-  IsInt,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { SupplierStatus } from '../../../generated/prisma'; // ✅ enums come from @prisma/client
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 export class CreateSupplierDto {
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  name!: string;
+  @MaxLength(120)
+  name: string;
 
+  @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  contact!: string;
+  @MaxLength(120)
+  brand: string;
 
+  @ApiProperty({ description: 'Mobile number' })
   @IsString()
   @IsNotEmpty()
-  brand!: string;
+  // keep your regex if you want
+  contact: string;
 
-  @IsEmail()
+  @ApiPropertyOptional()
   @IsOptional()
+  @IsEmail()
   email?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  @IsOptional()
-  address?: string;
+  @MaxLength(120)
+  location?: string;
 
-  // Optional in DTO because DB has a default "#000000"
-  @IsHexColor()
+  @ApiPropertyOptional()
   @IsOptional()
-  colorCode?: string;
-
   @IsString()
-  @IsNotEmpty()
-  location!: string;
-
-  @IsEnum(SupplierStatus)
-  @IsOptional()
-  status?: SupplierStatus;
-
-  @IsBoolean()
-  @IsOptional()
-  preferred?: boolean; // DB defaults to false if omitted
-
-  @IsString()
-  @IsOptional()
-  paymentTerms?: string;
-
-  @IsString()
-  @IsOptional()
+  @MaxLength(2000)
   notes?: string;
 
-  /**
-   * Optional: if you want to connect existing Location records.
-   * Not part of the Prisma model fields directly, but useful for API shape.
-   */
-  @IsArray()
-  @IsInt({ each: true })
-  @Type(() => Number)
+  @ApiPropertyOptional({ description: 'Defaults to #000000 if omitted' })
   @IsOptional()
-  locationIds?: number[];
+  @Matches(/^#?[0-9A-Fa-f]{6}$/, { message: 'colorCode must be RRGGBB or #RRGGBB' })
+  colorCode?: string;
 }

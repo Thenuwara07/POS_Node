@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNumber, IsPositive, IsString } from 'class-validator';
+import { IsIn, IsInt, IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
 
 export class CreateStockDto {
   @ApiProperty({
@@ -41,4 +41,9 @@ export class CreateStockDto {
   @IsInt()
   @IsPositive()
   supplierId: number;
+
+  @IsOptional()
+  @IsInt()
+  @IsIn([0, 1], { message: 'status must be 0 or 1' })
+  status?: number
 }
