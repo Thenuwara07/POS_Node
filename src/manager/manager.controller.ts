@@ -12,6 +12,8 @@ import {
   Logger,
   UsePipes,
   ValidationPipe,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -34,10 +36,11 @@ import { ManagerService } from './manager.service';
 import { CreateManagerDto } from './dto/create-manager.dto';
 import { UpdateManagerDto } from './dto/update-manager.dto';
 
-// NEW: import DTOs and service for creditors
+// --- CREDITORS ---
 import { CreateCreditorDto } from './dto/create-creditor.dto';
 import { UpdateCreditorDto } from './dto/update-creditor.dto';
 import { CreditorService } from './services/creditor.service';
+
 import { ManagerAuditLogsQueryDto } from './dto/manager-audit-logs-query.dto';
 
 @ApiTags('Manager')
@@ -54,20 +57,24 @@ export class ManagerController {
 
   constructor(
     private readonly managerService: ManagerService,
-    // NEW: inject creditor service
     private readonly creditorService: CreditorService,
   ) {}
 
-  // --- CREATE MANAGER ---
+  // ----------------------------------------------------------------
+  // -------------------------- USER CRUD ----------------------------
+  // ----------------------------------------------------------------
+
+  // --- CREATE MANAGER / USER ---
   @Post('add-user')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new user' })
-  @ApiCreatedResponse({ description: 'Manager created.' })
+  @ApiCreatedResponse({ description: 'User created.' })
   @ApiBadRequestResponse({ description: 'Invalid input or duplicate email.' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
   @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
+  @ApiConflictResponse({ description: 'Email already exists.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
   async create(@Body() dto: CreateManagerDto) {
     try {
@@ -79,13 +86,13 @@ export class ManagerController {
     }
   }
 
-  // --- GET ALL MANAGERS ---
+  // --- GET ALL USERS ---
   @Get('get-users')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get all users' })
-  @ApiOkResponse({ description: 'Managers fetched.' })
+  @ApiOkResponse({ description: 'Users fetched.' })
   async findAll(
     @Query('search') search?: string,
     @Query('role') role?: string,
@@ -100,7 +107,7 @@ export class ManagerController {
     }
   }
 
-  // --- GET ONE MANAGER ---
+  // --- GET ONE USER ---
   @Get('get-manager/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -115,7 +122,7 @@ export class ManagerController {
     }
   }
 
-  // --- UPDATE MANAGER ---
+  // --- UPDATE USER ---
   @Patch('update-manager/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
@@ -130,7 +137,7 @@ export class ManagerController {
     }
   }
 
-  // --- DELETE MANAGER ---
+  // --- DELETE USER ---
   @Delete('delete-manager/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('ADMIN')
@@ -144,6 +151,10 @@ export class ManagerController {
       throw new InternalServerErrorException('Failed to delete manager');
     }
   }
+
+  // ----------------------------------------------------------------
+  // ----------------------- TRENDING & AUDIT ------------------------
+  // ----------------------------------------------------------------
 
   // --- TRENDING ITEMS ---
   @Get('trending-items')
@@ -182,12 +193,12 @@ export class ManagerController {
   // ------------------------ CREDITORS CRUD -------------------------
   // ----------------------------------------------------------------
 
-  // CREATE
+  // CREATE CREDITOR
   @Post('creditors')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Create a creditor record' })
+  @ApiOperation({ summary: 'Create a creditor record (credit customer)' })
   @ApiCreatedResponse({ description: 'Creditor created.' })
   @ApiBadRequestResponse({ description: 'Invalid input.' })
   @ApiBody({
@@ -196,14 +207,17 @@ export class ManagerController {
       properties: {
         customerContact: { type: 'string', example: '+94771234567' },
         totalDue: { type: 'number', example: 1250.0 },
-        notes: { type: 'string', example: 'Carry over from invoice INV-2025-0012' },
+        notes: {
+          type: 'string',
+          example: 'Carry over from invoice INV-2025-0012',
+        },
       },
       required: ['customerContact', 'totalDue'],
     },
   })
   async createCreditor(@Body() dto: CreateCreditorDto) {
     try {
-      // If you keep userId in JWT, extract and pass it
+      // If you later add userId in JWT, pass it here
       return await this.creditorService.create(dto /*, userIdFromJwt */);
     } catch (err: any) {
       if (err?.status && err?.response) throw err;
@@ -212,53 +226,58 @@ export class ManagerController {
     }
   }
 
-  // LIST
+  // LIST CREDITORS (ALL CREDIT CUSTOMERS)
   @Get('creditors')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'List creditors' })
+  @ApiOperation({ summary: 'List all credit customers (creditors)' })
   @ApiOkResponse({ description: 'Creditor list fetched.' })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'offset', required: false })
   async listCreditors(
     @Query('search') search?: string,
-    @Query('limit') limit: number = 20,
-    @Query('offset') offset: number = 0,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit = 20,
+    @Query('offset', new DefaultValuePipe(0), ParseIntPipe) offset = 0,
   ) {
     try {
-      return await this.creditorService.findAll(search, Number(limit), Number(offset));
+      return await this.creditorService.findAll(search, limit, offset);
     } catch (err: any) {
+      if (err?.status && err?.response) throw err;
       this.logger.error('Failed to fetch creditors', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch creditors');
     }
   }
 
-  // GET ONE
-  @Get('creditors/:id')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('MANAGER')
-  @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get creditor by ID' })
-  async getCreditor(@Param('id') id: string) {
-    try {
-      return await this.creditorService.findOne(Number(id));
-    } catch (err: any) {
-      if (err?.status && err?.response) throw err;
-      this.logger.error('Failed to fetch creditor', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch creditor');
-    }
-  }
+  // GET ONE CREDITOR
+  // @Get('creditors/:id')
+  // @UseGuards(AuthGuard('jwt'), RolesGuard)
+  // @Roles('MANAGER')
+  // @ApiBearerAuth('JWT-auth')
+  // @ApiOperation({ summary: 'Get creditor by ID' })
+  // @ApiOkResponse({ description: 'Creditor fetched.' })
+  // async getCreditorById(@Param('id') id: string) {
+  //   try {
+  //     return await this.creditorService.findOne(Number(id));
+  //   } catch (err: any) {
+  //     if (err?.status && err?.response) throw err;
+  //     this.logger.error('Failed to fetch creditor', err?.stack || err);
+  //     throw new InternalServerErrorException('Failed to fetch creditor');
+  //   }
+  // }
 
-  // UPDATE
+  // UPDATE CREDITOR
   @Patch('creditors/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update creditor by ID' })
   @ApiOkResponse({ description: 'Creditor updated.' })
-  async updateCreditor(@Param('id') id: string, @Body() dto: UpdateCreditorDto) {
+  async updateCreditor(
+    @Param('id') id: string,
+    @Body() dto: UpdateCreditorDto,
+  ) {
     try {
       return await this.creditorService.update(Number(id), dto /*, userIdFromJwt */);
     } catch (err: any) {
@@ -268,10 +287,10 @@ export class ManagerController {
     }
   }
 
-  // DELETE
+  // DELETE CREDITOR
   @Delete('creditors/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('ADMIN') // keep delete stricter if you want
+  @Roles('ADMIN') // Keep delete stricter if you want
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete creditor by ID' })
   @ApiOkResponse({ description: 'Creditor deleted.' })
@@ -284,8 +303,12 @@ export class ManagerController {
       throw new InternalServerErrorException('Failed to delete creditor');
     }
   }
-  //--- Reports ----
-  //--- Items Details ----
+
+  // ----------------------------------------------------------------
+  // ---------------------------- REPORTS ----------------------------
+  // ----------------------------------------------------------------
+
+  // --- Items Details ----
   @Get('reports/items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -304,7 +327,7 @@ export class ManagerController {
     }
   }
 
-  //----Customers Details ----
+  // --- Customers Details ----
   @Get('reports/customers')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -321,9 +344,9 @@ export class ManagerController {
       this.logger.error('Failed to fetch customers', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch customers');
     }
-}
+  }
 
-  //--- User Details ----
+  // --- User Details ----
   @Get('reports/users')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -340,9 +363,9 @@ export class ManagerController {
       this.logger.error('Failed to fetch users', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch users');
     }
-}
+  }
 
- //-- Suplaier Details ----
+  // --- Supplier Details ----
   @Get('reports/suppliers')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -359,9 +382,9 @@ export class ManagerController {
       this.logger.error('Failed to fetch suppliers', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch suppliers');
     }
-}
+  }
 
-  //---Stock Details ----
+  // --- Stock Details ----
   @Get('reports/stocks')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -380,7 +403,7 @@ export class ManagerController {
     }
   }
 
-  //Invoice Details ----
+  // --- Invoice Details ----
   @Get('reports/invoices')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -399,7 +422,7 @@ export class ManagerController {
     }
   }
 
-  //Card Payment Details ----
+  // --- Card Payment Details ----
   @Get('reports/card-payments')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
@@ -418,11 +441,11 @@ export class ManagerController {
     }
   }
 
-  //Cash Payment Details ----
+  // --- Cash Payment Details ----
   @Get('reports/cash-payments')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
-  @ApiBearerAuth('JWT-auth')  
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get cash payment list' })
   @ApiOkResponse({ description: 'Cash payments fetched.' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
@@ -437,11 +460,11 @@ export class ManagerController {
     }
   }
 
-  //Daily sales report ----
+  // --- Daily Sales Report ----
   @Get('reports/daily-sales')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('MANAGER')
-  @ApiBearerAuth('JWT-auth')  
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get daily sales report' })
   @ApiOkResponse({ description: 'Daily sales report fetched.' })
   @ApiUnauthorizedResponse({ description: 'Missing/invalid JWT.' })
@@ -455,5 +478,4 @@ export class ManagerController {
       throw new InternalServerErrorException('Failed to fetch daily sales');
     }
   }
-
 }
