@@ -1,48 +1,87 @@
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
-function parseOrigins(csv?: string) {
-  return csv ? csv.split(',').map(s => s.trim()).filter(Boolean) : [];
+declare global {
+  interface BigInt {
+    toJSON(): number | string;
+  }
+}
+
+if (!(BigInt.prototype as any).toJSON) {
+  (BigInt.prototype as any).toJSON = function () {
+    const asNumber = Number(this);
+    return Number.isSafeInteger(asNumber) ? asNumber : this.toString();
+  };
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Enable CORS
+  app.enableCors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      
+      const ok =
+        /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+        /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin);
 
-    app.enableCors({
-    origin: false, // Your Flutter web port
-    credentials: true, // Required for cookies
+      if (ok) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'), false);
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
       'Authorization',
       'X-Requested-With',
       'Accept',
-      'origin'
-    ]
+      'Origin',
+    ],
+    credentials: false,
   });
 
-   // 🔥 Swagger setup
+  // Global validation
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+  }));
+
+  // Serve static files
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
+  });
+
+  // Swagger
   const config = new DocumentBuilder()
-    .setTitle('Auth API')
-    .setDescription('NestJS Authentication API (JWT-based)')
+    .setTitle('POS API')
+    .setDescription('Point of Sale System API')
     .setVersion('1.0')
     .addBearerAuth(
-      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
-      'JWT-auth', // key name
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        name: 'JWT',
+        description: 'Enter JWT token without Bearer prefix',
+        in: 'header',
+      },
+      'JWT-auth', // 🔹 must match your @ApiBearerAuth('JWT-auth')
     )
+    .addSecurityRequirements('JWT-auth')
     .build();
-
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  if (await app.listen(process.env.PORT ?? 3001)) {
-    console.log(`Server is running on port ${process.env.PORT ?? 3001}`);
-  } else {
-    console.error('Failed to start server');
-  }
-
+  await app.listen(process.env.PORT ?? 3001);
+  console.log(`Server running on port ${process.env.PORT ?? 3001}`);
 }
 bootstrap();

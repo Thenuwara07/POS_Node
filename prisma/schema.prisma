@@ -1,12 +1,7 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// =================== GENERATOR & DATASOURCE ===================
 generator client {
   provider = "prisma-client-js"
-  output   = "../generated/prisma"
+  output   = "../generated/prisma-client"
 }
 
 datasource db {
@@ -14,39 +9,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// =================== ENUMS ===================
 enum Role {
-  Admin
-  Cashier
-  Manager
-  StockKeeper
-}
-
-enum PaymentMethod {
-  CASH
-  CARD
-}
-
-model User {
-  id               Int       @id @default(autoincrement())
-  name             String
-  email            String    @unique
-  contact          String
-  password         String
-  role             Role      @default(Cashier)
-  colorCode        String    @default("#000000")
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  sales            Sale[]
-  payments         Payment[]
-  refreshTokenHash String?
-}
-
-model Customer {
-  id      Int    @id @default(autoincrement())
-  name    String
-  contact String @unique
-
-  payments Payment[]
+  ADMIN
+  MANAGER
+  CASHIER
+  STOCKKEEPER
 }
 
 enum SupplierStatus {
@@ -55,120 +23,317 @@ enum SupplierStatus {
   PENDING
 }
 
-enum RequestStatus {
+enum SupplierRequestStatus {
   PENDING
-  PURCHASED
+  ACCEPTED
   REJECTED
-  COMPLETED
+  RESENT
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+}
+
+enum PaymentDiscountType {
+  NO
+  PERCENTAGE
+  AMOUNT
+}
+
+// =================== MODELS ===================
+model User {
+  id               Int     @id @default(autoincrement())
+  name             String
+  email            String  @unique
+  contact          String
+  password         String
+  role             Role
+  colorCode        String  @default("#000000") @map("color_code")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  refreshTokenHash String? @map("refresh_token_hash")
+  passwordSalt     String? @map("password_salt")
+  passwordAlgo     String? @map("password_algo")
+
+  // Self-referencing audit
+  createdById Int?  @map("created_by")
+  updatedById Int?  @map("updated_by")
+  createdBy   User? @relation("user_created_by", fields: [createdById], references: [id])
+  updatedBy   User? @relation("user_updated_by", fields: [updatedById], references: [id])
+
+  // Back-relations
+  createdUsers      User[]        @relation("user_created_by")
+  updatedUsers      User[]        @relation("user_updated_by")
+  payments          Payment[]
+  reportAudits      ReportAudit[]
+  suppliersCreated  Supplier[]    @relation("supplier_created_by")
+  suppliersUpdated  Supplier[]    @relation("supplier_updated_by")
+  itemsCreated      Item[]        @relation("item_created_by")
+  priceRulesCreated PriceRule[]   @relation("price_rule_created_by")
+  priceRulesUpdated PriceRule[]   @relation("price_rule_updated_by")
+  categoriesCreated Category[]    @relation("category_created_by")
+  creditorsCreated  Creditor[]    @relation("creditor_created_by")
+  creditorsUpdated  Creditor[]    @relation("creditor_updated_by")
+  authLogs          AuthLog[]
+
+  @@map("user")
+}
+
+model Customer {
+  id      Int    @id @default(autoincrement())
+  name    String
+  contact String @unique
+
+  payments Payment[]
+  creditors Creditor[]
+
+  @@map("customer")
 }
 
 model Supplier {
-  id           Int                      @id @default(autoincrement())
+  id           Int            @id @default(autoincrement())
   name         String
   contact      String
-  email        String? // Optional email
-  address      String? // Optional address
+  email        String?
+  address      String?
   brand        String
-  colorCode    String                   @default("#000000")
-  location     String
-  status       SupplierStatus?
-  stockItems   Stock[]
-  items        Item[]
-  requests     SupplierRequestDetails[]
-  transactions SupplierTransaction[]
-  preferred    Boolean                  @default(false) // ✅ Preferred Supplier
-  paymentTerms String? // ✅ Payment Terms         
-  notes        String? // ✅ Remarks/Notes              
+  colorCode    String         @default("#000000") @map("color_code")
+  location     String?
+  status       SupplierStatus @default(ACTIVE)
+  preferred    Int            @default(0)
+  
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdById Int?  @map("created_by")
+  updatedById Int?  @map("updated_by")
+  createdBy   User? @relation("supplier_created_by", fields: [createdById], references: [id])
+  updatedBy   User? @relation("supplier_updated_by", fields: [updatedById], references: [id])
+
+  stockItems Stock[]
+  items      Item[]
+  requests   SupplierRequest[]
+
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("supplier")
+}
+
+model Category {
+  id            Int     @id @default(autoincrement())
+  category      String  @unique
+  colorCode     String  @map("color_code")
+  categoryImage String? @map("category_image")
+  createdById   Int?    @map("created_by")
+
+  createdBy User?  @relation("category_created_by", fields: [createdById], references: [id])
+  items     Item[]
+
+  @@index([createdById])
+  @@map("category")
+}
+
+model Item {
+  id           Int     @id @default(autoincrement())
+  name         String
+  barcode      String?  @unique
+  categoryId   Int     @map("category_id")
+  supplierId   Int     @map("supplier_id")
+  reorderLevel Int     @default(0) @map("reorder_level")
+  gradient     String?
+  remark       String?
+  colorCode    String  @default("#000000") @map("color_code")
+  imagePath    String? @map("image_path")
+  createdById  Int?    @map("created_by")
+  status       Int      @default(1) @map("status")
+  category             Category              @relation(fields: [categoryId], references: [id])
+  supplier             Supplier              @relation(fields: [supplierId], references: [id])
+  createdBy            User?                 @relation("item_created_by", fields: [createdById], references: [id])
+  stock                Stock[]
+  invoices             Invoice[]
+  supplierRequestItems SupplierRequestItem[]
+
+  @@index([categoryId])
+  @@index([supplierId])
+  @@index([createdById])
+  @@map("item")
 }
 
 model Stock {
-  id        Int    @id @default(autoincrement())
-  batchId   String
-  itemId    Int
-  quantity  Int
-  unitPrice Float
-  sellPrice Float
-  discountAmount Float   @default(0)  // ✅ new column
+  id             Int    @id @default(autoincrement())
+  batchId        String @map("batch_id")
+  itemId         Int    @map("item_id")
+  quantity       Int
+  unitPrice      Float  @map("unit_price")
+  sellPrice      Float  @map("sell_price")
+  discountAmount Float  @default(0) @map("discount_amount")
+  supplierId     Int    @map("supplier_id")
 
-  item       Item     @relation(fields: [itemId], references: [id])
-  supplierId Int
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
-}
+  item     Item     @relation(fields: [itemId], references: [id])
+  supplier Supplier @relation(fields: [supplierId], references: [id])
 
-model Invoice {
-  id            Int    @id @default(autoincrement())
-  batchId       String
-  itemId        Int
-  quantity      Int
-  saleInvoiceId Int
-
-  saleInvoice Payment? @relation(fields: [saleInvoiceId], references: [id])
+  @@unique([batchId, itemId])
+  @@index([itemId])
+  @@index([supplierId])
+  @@map("stock")
 }
 
 model Payment {
-  id              Int      @id @default(autoincrement())
+  id              Int                 @id @default(autoincrement())
   amount          Float
-  remainAmount    Float
-  date            DateTime
-  fileName        String
-  type            String
-  saleInvoiceId   Int?
-  userId          Int?
-  customerContact String?
+  remainAmount    Float               @map("remain_amount")
+  date            BigInt
+  fileName        String              @map("file_name")
+  type            PaymentMethod       @map("type")
+  saleInvoiceId   String?             @unique @map("sale_invoice_id")
+  userId          Int?                @map("user_id")
+  customerContact String?             @map("customer_contact")
+  discountType    PaymentDiscountType @default(NO) @map("discount_type")
+  discountValue   Float               @default(0) @map("discount_value")
 
   invoices Invoice[]
   user     User?     @relation(fields: [userId], references: [id])
   customer Customer? @relation(fields: [customerContact], references: [contact])
+
+  @@index([userId])
+  @@index([saleInvoiceId])
+  @@map("payment")
 }
 
-model Item {
-  id           Int      @id @default(autoincrement())
-  name         String
-  barcode      String   @unique
-  categoryId   Int
-  category     Category @relation("CategoryItems", fields: [categoryId], references: [id]) // Reverse relation with the same relation name "CategoryItems"
-  supplierId   Int
-  reorderLevel Int      @default(0)
-  gradient     String? // save gradient/color info (HEX or JSON if multiple colors)
-  remark       String?  @db.Text
-  colorCode    String   @default("#000000")
+model Invoice {
+  id             Int    @id @default(autoincrement())
+  batchId        String @map("batch_id")
+  itemId         Int    @map("item_id")
+  quantity       Int
+  unitSaledPrice Float  @map("unit_saled_price")
+  saleInvoiceId  String @map("sale_invoice_id")
 
-  supplier Supplier @relation(fields: [supplierId], references: [id])
-  stock    Stock[]
+  item        Item     @relation(fields: [itemId], references: [id])
+  saleInvoice Payment? @relation(fields: [saleInvoiceId], references: [saleInvoiceId])
+
+  @@index([saleInvoiceId])
+  @@map("invoice")
 }
 
-model Category {
-  id        Int    @id @default(autoincrement())
-  category  String
-  colorCode String
-  items     Item[] @relation("CategoryItems") // Relation to Item with a named relation
+model SupplierRequest {
+  id         Int                   @id @default(autoincrement())
+  supplierId Int                   @map("supplier_id")
+  status     SupplierRequestStatus @default(PENDING)
+  createdAt  BigInt                @map("created_at")
+  updatedAt  BigInt                @map("updated_at")
+
+  supplier Supplier              @relation(fields: [supplierId], references: [id])
+  items    SupplierRequestItem[]
+
+  @@index([supplierId])
+  @@map("supplier_request")
 }
 
-// my code Inscode 
+model SupplierRequestItem {
+  id              Int   @id @default(autoincrement())
+  requestId       Int   @map("request_id")
+  itemId          Int   @map("item_id")
+  requestedAmount Int   @default(0) @map("requested_amount")
+  quantity        Int   @default(0)
+  unitPrice       Float @default(0) @map("unit_price")
+  salePrice       Float @default(0) @map("sale_price")
 
-model Sale {
-  id     Int      @id @default(autoincrement())
-  date   DateTime @default(now())
-  total  Float
-  userId Int
-  user   User     @relation(fields: [userId], references: [id])
-  // add more fields & relations
+  request SupplierRequest @relation(fields: [requestId], references: [id])
+  item    Item            @relation(fields: [itemId], references: [id])
+
+  @@index([requestId])
+  @@index([itemId])
+  @@map("supplier_request_item")
 }
 
-model SupplierRequestDetails {
-  id         Int      @id @default(autoincrement())
-  supplierId Int
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
-  status     RequestStatus
+model ReportAudit {
+  id         Int     @id @default(autoincrement())
+  reportCode String  @map("report_code")
+  fromTs     BigInt  @map("from_ts")
+  toTs       BigInt  @map("to_ts")
+  query      String?
+  userId     Int?    @map("user_id")
+  viewedAt   BigInt  @map("viewed_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([reportCode, viewedAt])
+  @@index([userId])
+  @@map("report_audit")
 }
 
-model SupplierTransaction {
-  id         Int      @id @default(autoincrement())
-  supplierId Int
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
-  amount     Float
-  date       DateTime @default(now())
+model PriceRule {
+  id               Int     @id @default(autoincrement())   // << was String @id
+  name             String
+  type             String
+  scopeKind        String  @map("scope_kind")
+  scopeValue       String  @default("") @map("scope_value")
+  value            Float
+  stackable        Int     @default(1)
+  active           Int     @default(1)
+  priority         Int     @default(10)
+  perCustomerLimit Int?    @map("per_customer_limit")
+  startTime        String? @map("start_time")
+  endTime          String? @map("end_time")
+  startDate        BigInt? @map("start_date")
+  endDate          BigInt? @map("end_date")
+  daysOfWeek       String? @map("days_of_week")
+  createdAt        BigInt  @map("created_at")
+  updatedAt        BigInt  @map("updated_at")
+  createdById      Int?    @map("created_by")
+  updatedById      Int?    @map("updated_by")
+  createdBy        User?   @relation("price_rule_created_by", fields: [createdById], references: [id])
+  updatedBy        User?   @relation("price_rule_updated_by", fields: [updatedById], references: [id])
+
+  @@index([active])
+  @@index([priority])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("price_rule")
+}
+
+model Creditor {
+  id              Int       @id @default(autoincrement())
+  customerContact String    @map("customer_contact")
+  totalDue        Float     @default(0) @map("total_due")
+  notes           String?
+  lastPaymentAt   BigInt?   @map("last_payment_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // optional audit
+  createdById Int?  @map("created_by")
+  updatedById Int?  @map("updated_by")
+  createdBy   User? @relation("creditor_created_by", fields: [createdById], references: [id])
+  updatedBy   User? @relation("creditor_updated_by", fields: [updatedById], references: [id])
+
+  // relations
+  customer Customer? @relation(fields: [customerContact], references: [contact])
+
+  @@index([customerContact])
+  @@index([createdById])
+  @@index([updatedById])
+  @@map("creditor")
+}
+enum AuthAction {
+  LOGIN
+  LOGOUT
+}
+
+model AuthLog {
+  id         Int        @id @default(autoincrement())
+  userId     Int?       @map("user_id")
+  email      String?
+  action     AuthAction
+  timestamp  BigInt     @map("ts")
+  ip         String?
+  userAgent  String?    @map("user_agent")
+  meta       Json?
+
+  user       User?      @relation(fields: [userId], references: [id])
+
+  @@index([userId, timestamp])
+  @@map("auth_log")
 }
