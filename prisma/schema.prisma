@@ -98,6 +98,7 @@ model Supplier {
   location     String?
   status       SupplierStatus @default(ACTIVE)
   preferred    Int            @default(0)
+  active       Boolean        @default(true)
   
   notes        String?
   createdAt    DateTime @default(now()) @map("created_at")
