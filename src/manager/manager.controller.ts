@@ -94,13 +94,9 @@ export class ManagerController {
   @ApiOperation({ summary: 'Get all users' })
   @ApiOkResponse({ description: 'Users fetched.' })
   async findAll(
-    @Query('search') search?: string,
-    @Query('role') role?: string,
-    @Query('limit') limit?: number,
-    @Query('offset') offset?: number,
   ) {
     try {
-      return await this.managerService.findAll(search, role, limit, offset);
+      return await this.managerService.findAll();
     } catch (err: any) {
       this.logger.error('Failed to fetch managers', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch managers');
