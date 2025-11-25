@@ -11,7 +11,9 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 import { CreateManagerDto } from './dto/create-manager.dto';
 import { UpdateManagerDto } from './dto/update-manager.dto';
 import { hash, compare } from 'bcryptjs';
-import { Role } from '@prisma/client';
+import { Prisma, Role } from '../../generated/prisma-client';
+import { ManagerAuditLogsQueryDto } from './dto/manager-audit-logs-query.dto';
+
 
 @Injectable()
 export class ManagerService {
@@ -182,25 +184,271 @@ export class ManagerService {
   }
 
   // ✅ Get audit logs
-  async getAuditLogs(userId?: number, reportCode?: string, limit = 20, offset = 0) {
+  async getAuditLogs(query: ManagerAuditLogsQueryDto) {
     try {
-      const where: any = {};
-      if (userId) where.userId = Number(userId);
-      if (reportCode) where.reportCode = reportCode;
+      const limit = Math.min(200, Math.max(1, query.limit ?? 50));
+      const offset = Math.max(0, query.offset ?? 0);
 
-      const logs = await this.prisma.reportAudit.findMany({
-        where,
-        orderBy: { viewedAt: 'desc' },
-        take: limit,
-        skip: offset,
-        include: {
-          user: { select: { id: true, name: true, email: true, role: true } },
-        },
-      });
+      const andFilters: Prisma.AuthLogWhereInput[] = [];
+      if (query.fromTs) andFilters.push({ timestamp: { gte: BigInt(query.fromTs) } });
+      if (query.toTs) andFilters.push({ timestamp: { lte: BigInt(query.toTs) } });
 
-      return logs;
+      const where: Prisma.AuthLogWhereInput = {
+        ...(query.userId ? { userId: query.userId } : {}),
+        ...(query.action ? { action: query.action } : {}),
+        ...(andFilters.length ? { AND: andFilters } : {}),
+      };
+
+      const [items, total] = await this.prisma.$transaction([
+        this.prisma.authLog.findMany({
+          where,
+          orderBy: { timestamp: 'desc' },
+          skip: offset,
+          take: limit,
+          include: {
+            user: { select: { id: true, name: true, email: true, role: true } },
+          },
+        }),
+        this.prisma.authLog.count({ where }),
+      ]);
+
+      return { total, limit, offset, items };
     } catch (err) {
       this.handlePrismaError(err, 'getAuditLogs');
     }
   }
+
+  async findAllItems() {
+    try {
+      const items = await this.prisma.item.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          barcode: true,
+          category: { 
+            select: { id: true, category: true } 
+          },
+          stock: {
+            select: {
+              itemId: true,
+              quantity: true,
+              unitPrice: true,
+              sellPrice: true,
+            },
+          },
+        },
+      });
+
+      return items;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllItems');
+    }
+  }
+
+  async findAllCustomers() {
+    try {
+      const customers = await this.prisma.customer.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          contact: true,
+        },
+      });
+
+      return customers;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllCustomers');
+    }
+  }
+
+  async findAllUsers() {
+    try {
+      const users = await this.prisma.user.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          createdAt: true,
+        },
+      });
+
+      return users;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllUsers');
+    }
+  }
+
+
+  async findAllSuppliers() {
+    try {
+      const suppliers = await this.prisma.supplier.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          name: true,
+          contact: true,
+          email: true,
+          address: true,
+          status: true,
+        },
+      });
+
+      return suppliers;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllSuppliers');
+    }
+  }
+
+  async findAllStocks() {
+    try {
+      const stocks = await this.prisma.stock.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          item: { 
+            select: { 
+              id: true,
+              name: true,
+              barcode: true,
+              reorderLevel: true,
+              category: { 
+                select: { id: true, category: true } 
+              },
+            } 
+          },
+          quantity: true,
+
+        },
+      });
+
+      return stocks;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllStocks');
+    }
+  }
+
+  async findAllInvoices() {
+    try {
+      const invoicesRaw = await this.prisma.payment.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true, // bigint epoch (likely seconds)
+          customer: { select: { name: true } },
+          type: true,
+          amount: true,
+        },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; // 10 digits => seconds, 13 => ms
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
+      });
+
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllInvoices');
+    }
+  }
+
+
+   async findAllCardPayments() {
+    try {
+      const invoicesRaw = await this.prisma.payment.findMany({
+        where: { type: 'CARD' },
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true,
+          type: true,
+          amount: true,
+        },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; 
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
+      });
+
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllCardPayments');
+    }
+  }
+
+  async findAllCashPayments() {
+    try {
+      const invoicesRaw = await this.prisma.payment.findMany({
+        where: { type: 'CASH' },
+        orderBy: { id: 'desc' },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true,
+          type: true,
+          amount: true,
+        },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; 
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
+      });
+
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllCashPayments');
+    }
+  }
+
+  async findAllDailySales() {
+    try {
+      const invoicesRaw = await this.prisma.payment.findMany({
+        orderBy: { id: 'desc' },
+        select: {
+          saleInvoiceId: true,
+          date: true, // bigint epoch (likely seconds)
+          customer: { select: { name: true } },
+          type: true,
+          amount: true,
+        },
+      });
+
+      // Convert epoch (seconds or ms) -> ISO string
+      const invoices = invoicesRaw.map((i) => {
+        const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
+        const ms = n < 1e12 ? n * 1000 : n; // 10 digits => seconds, 13 => ms
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
+      });
+
+      return invoices;
+    } catch (err) {
+      this.handlePrismaError(err, 'findAllInvoices');
+    }
+  }
+
 }

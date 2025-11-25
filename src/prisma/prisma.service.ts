@@ -1,13 +1,26 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-// match your generator output path
-import { PrismaClient } from '../../generated/prisma';
+
+// ✅ MUST MATCH prisma.schema output EXACTLY:
+import { PrismaClient } from '../../generated/prisma-client';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
-  creditor: any;
+
+  constructor() {
+    // ✅ Enable expanded logging if you want
+    super({
+      log: [
+        { emit: 'stdout', level: 'query' },
+        { emit: 'stdout', level: 'error' },
+        { emit: 'stdout', level: 'warn' },
+      ],
+    });
+  }
+
   async onModuleInit() {
     await this.$connect();
   }
+
   async onModuleDestroy() {
     await this.$disconnect();
   }

@@ -6,6 +6,19 @@ import { join } from 'path';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
+declare global {
+  interface BigInt {
+    toJSON(): number | string;
+  }
+}
+
+if (!(BigInt.prototype as any).toJSON) {
+  (BigInt.prototype as any).toJSON = function () {
+    const asNumber = Number(this);
+    return Number.isSafeInteger(asNumber) ? asNumber : this.toString();
+  };
+}
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
@@ -63,6 +76,7 @@ async function bootstrap() {
       },
       'JWT-auth', // 🔹 must match your @ApiBearerAuth('JWT-auth')
     )
+    .addSecurityRequirements('JWT-auth')
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);

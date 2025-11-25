@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { CreateUserDto } from './dto/create-user.dto';
-import { Role } from '@prisma/client';
+import { Role } from '../../generated/prisma-client';
 
 
 @Injectable()
@@ -125,7 +125,11 @@ export class AuthService {
   // Register a new user
   // Register a new user
 async register(createUserDto: CreateUserDto) {
-  const { email, password, role, name, contact } = createUserDto;
+  const email = createUserDto.email.trim().toLowerCase();
+  const password = createUserDto.password.trim();
+  const name = createUserDto.name.trim();
+  const contact = createUserDto.contact.trim();
+  const role = createUserDto.role as Role;
 
   const existing = await this.prisma.user.findUnique({ where: { email } });
   if (existing) throw new ConflictException('User already exists');
