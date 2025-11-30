@@ -1,7 +1,7 @@
 // supplier/dto/create-supplier.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, IsBoolean, IsEnum } from 'class-validator';
-import { SupplierStatus } from '@prisma/client';
+import { SupplierStatus } from '../../../generated/prisma-client';
 
 export class CreateSupplierDto {
   @ApiProperty()
