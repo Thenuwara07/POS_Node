@@ -106,7 +106,7 @@ export class ManagerService {
   async update(id: number, dto: UpdateManagerDto) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
-      if (!existing) throw new NotFoundException('Manager not found');
+      if (!existing) throw new NotFoundException('User not found');
 
       // Ensure unique email
       if (dto.email && dto.email.toLowerCase() !== existing.email.toLowerCase()) {
@@ -131,18 +131,18 @@ export class ManagerService {
         },
       });
     } catch (err) {
-      this.handlePrismaError(err, 'updateManager');
+      this.handlePrismaError(err, 'updateUser');
     }
   }
 
-  // ✅ Delete a manager
+  // ✅ Delete a user
   async remove(id: number) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
-      if (!existing) throw new NotFoundException('Manager not found');
+      if (!existing) throw new NotFoundException('User not found');
       return await this.prisma.user.delete({ where: { id } });
     } catch (err) {
-      this.handlePrismaError(err, 'removeManager');
+      this.handlePrismaError(err, 'removeUser');
     }
   }
 

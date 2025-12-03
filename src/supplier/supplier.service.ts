@@ -7,10 +7,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { PrismaClientKnownRequestError } from '../../generated/prisma-client/runtime/library';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
-import { SupplierStatus } from '@prisma/client';
+import { SupplierStatus } from '../../generated/prisma-client';
 
 @Injectable()
 export class SupplierService {
