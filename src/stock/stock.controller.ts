@@ -251,7 +251,7 @@ export class StockController {
   // --- CATEGORY: List ---
   @Get('categories')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER','MANAGER')
+  @Roles('STOCKKEEPER','MANAGER','CASHIER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'List all categories' })
   @ApiUnauthorizedResponse({description:'Missing/Invalid JWT.'})
