@@ -110,7 +110,7 @@ export class SupplierController {
 
   @Get('suppliers')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER', 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'List suppliers' })
   @ApiOkResponse({ description: 'Suppliers fetched.' })
@@ -129,7 +129,7 @@ export class SupplierController {
 
   @Get('suppliers/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER', 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get supplier by id' })
   @ApiOkResponse({ description: 'Supplier fetched.' })
@@ -145,7 +145,7 @@ export class SupplierController {
 
   @Patch('suppliers/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER', 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update supplier (optional)' })
   @ApiOkResponse({ description: 'Supplier updated.' })
@@ -169,7 +169,7 @@ export class SupplierController {
 
   @Delete('suppliers/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER', 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Delete supplier (optional)' })
   @ApiOkResponse({ description: 'Supplier deleted.' })
