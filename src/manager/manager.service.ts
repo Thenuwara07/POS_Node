@@ -106,7 +106,7 @@ export class ManagerService {
   async update(id: number, dto: UpdateManagerDto) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
-      if (!existing) throw new NotFoundException('Manager not found');
+      if (!existing) throw new NotFoundException('User not found');
 
       // Ensure unique email
       if (dto.email && dto.email.toLowerCase() !== existing.email.toLowerCase()) {
@@ -115,6 +115,17 @@ export class ManagerService {
         });
         if (emailExists) throw new BadRequestException('Email already exists');
       }
+
+      const normalizedRole =
+        dto.role !== undefined
+          ? (() => {
+              const roleUpper = dto.role.toUpperCase() as Role;
+              if (!(Object.values(Role) as string[]).includes(roleUpper)) {
+                throw new BadRequestException('Invalid role');
+              }
+              return roleUpper;
+            })()
+          : existing.role;
 
       return await this.prisma.user.update({
         where: { id },
@@ -125,24 +136,24 @@ export class ManagerService {
           password: dto.password
             ? await hash(dto.password, 10)
             : existing.password,
-          role: (dto.role as Role) || existing.role,
+          role: normalizedRole,
           colorCode: dto.colorCode ?? existing.colorCode,
           updatedAt: new Date(),
         },
       });
     } catch (err) {
-      this.handlePrismaError(err, 'updateManager');
+      this.handlePrismaError(err, 'updateUser');
     }
   }
 
-  // ✅ Delete a manager
+  // ✅ Delete a user
   async remove(id: number) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
-      if (!existing) throw new NotFoundException('Manager not found');
+      if (!existing) throw new NotFoundException('User not found');
       return await this.prisma.user.delete({ where: { id } });
     } catch (err) {
-      this.handlePrismaError(err, 'removeManager');
+      this.handlePrismaError(err, 'removeUser');
     }
   }
 

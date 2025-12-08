@@ -119,32 +119,32 @@ export class ManagerController {
   }
 
   // --- UPDATE USER ---
-  @Patch('update-manager/:id')
+  @Patch('update-user/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('ADMIN')
+  @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Update manager details' })
+  @ApiOperation({ summary: 'Update user details' })
   async update(@Param('id') id: string, @Body() dto: UpdateManagerDto) {
     try {
       return await this.managerService.update(Number(id), dto);
     } catch (err: any) {
-      this.logger.error('Failed to update manager', err?.stack || err);
-      throw new InternalServerErrorException('Failed to update manager');
+      this.logger.error('Failed to update user', err?.stack || err);
+      throw new InternalServerErrorException('Failed to update user');
     }
   }
 
   // --- DELETE USER ---
-  @Delete('delete-manager/:id')
+  @Delete('delete-user/:id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('ADMIN')
+  @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Delete manager by ID' })
+  @ApiOperation({ summary: 'Delete user by ID' })
   async remove(@Param('id') id: string) {
     try {
       return await this.managerService.remove(Number(id));
     } catch (err: any) {
-      this.logger.error('Failed to delete manager', err?.stack || err);
-      throw new InternalServerErrorException('Failed to delete manager');
+      this.logger.error('Failed to delete user', err?.stack || err);
+      throw new InternalServerErrorException('Failed to delete user');
     }
   }
 
