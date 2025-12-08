@@ -280,7 +280,7 @@ export class StockController {
   // --- ITEMS: List with summaries ---
   @Get('items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+  @Roles('STOCKKEEPER', 'MANAGER', 'CASHIER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'List items with category, creator, qty, weighted prices, status & total',
