@@ -116,6 +116,17 @@ export class ManagerService {
         if (emailExists) throw new BadRequestException('Email already exists');
       }
 
+      const normalizedRole =
+        dto.role !== undefined
+          ? (() => {
+              const roleUpper = dto.role.toUpperCase() as Role;
+              if (!(Object.values(Role) as string[]).includes(roleUpper)) {
+                throw new BadRequestException('Invalid role');
+              }
+              return roleUpper;
+            })()
+          : existing.role;
+
       return await this.prisma.user.update({
         where: { id },
         data: {
@@ -125,7 +136,7 @@ export class ManagerService {
           password: dto.password
             ? await hash(dto.password, 10)
             : existing.password,
-          role: (dto.role as Role) || existing.role,
+          role: normalizedRole,
           colorCode: dto.colorCode ?? existing.colorCode,
           updatedAt: new Date(),
         },
