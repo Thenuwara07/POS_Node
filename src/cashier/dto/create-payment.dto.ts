@@ -7,7 +7,7 @@ const toEpochMs = (v: any): number => {
   if (typeof v === 'bigint') return Number(v);
   if (typeof v === 'string' && v.trim()) {
     const n = Number(v);
-    if (!Number.isNaN(n) && n > 10_000_000_000) return n; // already ms
+    if (!Number.isNaN(n) && n > 10_000_000_000) return n;
     const ts = Date.parse(v);
     if (!Number.isNaN(ts)) return ts;
   }
@@ -27,12 +27,14 @@ const normDiscount = (v: unknown): 'no' | 'percentage' | 'amount' => {
 export class CreatePaymentDto {
   @ApiProperty({ example: 1500.0 })
   @Transform(({ value }) => Number(value))
-  @IsNumber() @Min(0)
+  @IsNumber()
+  @Min(0)
   amount!: number;
 
   @ApiProperty({ name: 'remain_amount', example: 500.0 })
   @Transform(({ value, obj }) => Number(value ?? obj?.remainAmount))
-  @IsNumber() @Min(0)
+  @IsNumber()
+  @Min(0)
   remain_amount!: number;
 
   @ApiProperty({ example: 1730563200000, description: 'epoch ms or ISO string' })
@@ -47,31 +49,44 @@ export class CreatePaymentDto {
 
   @ApiProperty({ example: 'Cash', description: 'Cash | Card' })
   @Transform(({ value }) => normType(value))
-  @IsString() @IsIn(['Cash', 'Card'])
+  @IsString()
+  @IsIn(['Cash', 'Card'])
   type!: 'Cash' | 'Card';
 
-  @ApiProperty({ name: 'sale_invoice_id', example: 'INV-001' })
-  @Transform(({ value, obj }) => (value ?? obj?.salesInvoiceId ?? '').toString())
+  @ApiPropertyOptional({
+    name: 'sale_invoice_id',
+    example: 'INV-001',
+    description: 'Leave empty to auto-generate (e.g., INV-001, INV-002, ...)',
+  })
+  @Transform(({ value, obj }) => {
+    const v = value ?? obj?.salesInvoiceId;
+    return v == null ? undefined : v.toString();
+  })
+  @IsOptional()
   @IsString()
-  sale_invoice_id!: string;
+  sale_invoice_id?: string;
 
   @ApiPropertyOptional({ name: 'user_id', example: 1, nullable: true })
   @Transform(({ value, obj }) => value ?? obj?.userId ?? null)
-  @IsOptional() @IsInt()
+  @IsOptional()
+  @IsInt()
   user_id?: number | null;
 
   @ApiPropertyOptional({ name: 'customer_contact', example: '0771234567', nullable: true })
   @Transform(({ value, obj }) => value ?? obj?.customerContact ?? null)
-  @IsOptional() @IsString()
+  @IsOptional()
+  @IsString()
   customer_contact?: string | null;
 
   @ApiProperty({ name: 'discount_type', example: 'no', description: 'no | percentage | amount' })
   @Transform(({ value }) => normDiscount(value))
-  @IsString() @IsIn(['no', 'percentage', 'amount'])
+  @IsString()
+  @IsIn(['no', 'percentage', 'amount'])
   discount_type!: 'no' | 'percentage' | 'amount';
 
   @ApiProperty({ name: 'discount_value', example: 0.0 })
   @Transform(({ value }) => (value == null ? 0 : Number(value)))
-  @IsNumber() @Min(0)
+  @IsNumber()
+  @Min(0)
   discount_value!: number;
 }
