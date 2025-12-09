@@ -59,7 +59,7 @@ export class SupplierController {
   // Add Supplier 
   @Post('suppliers')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER', 'MANAGER') // Allow managers to create too (keeps parity with update/delete)
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new supplier' })
   @ApiBody({
