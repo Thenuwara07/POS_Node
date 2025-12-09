@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsInt, IsNumber, IsString, Min } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class InvoiceLineDto {
   @ApiProperty({ name: 'batch_id', example: 'BATCH001' })
@@ -25,11 +25,20 @@ export class InvoiceLineDto {
     return Number.isFinite(n) ? n : 0;
   })
   @IsInt()
-  @Min(0)
+  @Min(1)
   quantity!: number;
 
-  @ApiProperty({ name: 'unit_saled_price', example: 120.0 })
-  @Transform(({ value, obj }) => Number(value ?? obj?.unitSaledPrice))
+  @ApiProperty({
+    name: 'unit_saled_price',
+    example: 120.0,
+    required: false,
+    description: 'If omitted, backend uses stock.sell_price - stock.discount_amount for batch/item.',
+  })
+  @Transform(({ value, obj }) => {
+    const v = value ?? obj?.unitSaledPrice;
+    return v == null ? undefined : Number(v);
+  })
+  @IsOptional()
   @IsNumber()
-  unit_saled_price!: number;
+  unit_saled_price?: number;
 }
