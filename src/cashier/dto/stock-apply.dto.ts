@@ -1,43 +1,110 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class StockApplyUpdatedDto {
-  @ApiProperty() batch_id!: string;
-  @ApiProperty() item_id!: number;
-  @ApiProperty() deducted!: number;
-  @ApiPropertyOptional() note?: string;
-}
+// -------- Request DTOs --------
 
-export class StockApplyWarnDto {
-  @ApiProperty() batch_id!: string;
-  @ApiProperty() item_id!: number;
-  @ApiProperty() requested!: number;
-  @ApiPropertyOptional() available?: number | null;
-  @ApiProperty({ enum: ['invalid_input', 'insufficient_stock'] }) reason!: 'invalid_input' | 'insufficient_stock';
-}
+export class UpdateStockFromInvoicesLineDto {
+  @ApiProperty({ example: 'BATCH-AMBUN-001' })
+  @IsString()
+  batch_id: string; // or batchId on frontend – service accepts both
 
-export class StockApplyMissingDto {
-  @ApiProperty() batch_id!: string;
-  @ApiProperty() item_id!: number;
-  @ApiProperty() requested!: number;
-  @ApiProperty({ enum: ['not_found'] }) reason!: 'not_found';
-}
+  @ApiProperty({ example: 3, description: 'item_id; 0 = quick sale / service' })
+  @IsInt()
+  @Min(0)
+  item_id: number;
 
-export class StockApplyResultDto {
-  @ApiProperty({ type: StockApplyUpdatedDto, isArray: true }) updated!: StockApplyUpdatedDto[];
-  @ApiProperty({ type: StockApplyWarnDto, isArray: true }) warnings!: StockApplyWarnDto[];
-  @ApiProperty({ type: StockApplyMissingDto, isArray: true }) missing!: StockApplyMissingDto[];
-  // convenience getter in TS not serialized; omit here
+  @ApiProperty({ example: 2, description: 'Quantity to deduct from stock' })
+  @IsInt()
+  @Min(1)
+  quantity: number;
 }
 
 export class UpdateStockFromInvoicesPayloadDto {
   @ApiProperty({
-    type: 'array',
-    items: { type: 'object', additionalProperties: true },
-    description: 'Array of invoice lines; supports snake_case or camelCase keys',
-    example: [
-      { batch_id: 'B1', item_id: 5, quantity: 2 },
-      { batchId: 'B2', itemId: 7, quantity: 1 },
-    ],
+    type: UpdateStockFromInvoicesLineDto,
+    isArray: true,
+    description: 'Invoice lines for which stock must be deducted',
   })
-  invoices!: Array<Record<string, any>>;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateStockFromInvoicesLineDto)
+  invoices: UpdateStockFromInvoicesLineDto[];
+}
+
+// -------- Response DTOs --------
+
+export class StockApplyUpdatedDto {
+  @ApiProperty({ example: 'BATCH-AMBUN-001' })
+  batch_id: string;
+
+  @ApiProperty({ example: 3 })
+  item_id: number;
+
+  @ApiProperty({ example: 2, description: 'Actually deducted from stock' })
+  deducted: number;
+
+  @ApiProperty({
+    example: 'item_id=0 Quick sale',
+    required: false,
+  })
+  @IsOptional()
+  note?: string;
+}
+
+export class StockApplyWarnDto {
+  @ApiProperty({ example: 'BATCH-COCA-001' })
+  batch_id: string;
+
+  @ApiProperty({ example: 5 })
+  item_id: number;
+
+  @ApiProperty({ example: 5 })
+  requested: number;
+
+  @ApiProperty({
+    example: 2,
+    nullable: true,
+    description: 'Available quantity; null if invalid input',
+  })
+  @IsOptional()
+  available: number | null;
+
+  @ApiProperty({
+    example: 'insufficient_stock',
+    description: 'invalid_input | insufficient_stock',
+  })
+  reason: string;
+}
+
+export class StockApplyMissingDto {
+  @ApiProperty({ example: 'BATCH-UNKNOWN-001' })
+  batch_id: string;
+
+  @ApiProperty({ example: 9 })
+  item_id: number;
+
+  @ApiProperty({ example: 3 })
+  requested: number;
+
+  @ApiProperty({ example: 'not_found' })
+  reason: string;
+}
+
+export class StockApplyResultDto {
+  @ApiProperty({ type: StockApplyUpdatedDto, isArray: true })
+  updated: StockApplyUpdatedDto[];
+
+  @ApiProperty({ type: StockApplyWarnDto, isArray: true })
+  warnings: StockApplyWarnDto[];
+
+  @ApiProperty({ type: StockApplyMissingDto, isArray: true })
+  missing: StockApplyMissingDto[];
 }
