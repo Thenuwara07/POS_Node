@@ -1,20 +1,34 @@
-// src/cashier/cashier.service.ts
-import { BadRequestException, ConflictException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { ItemDto } from './dto/item.dto';
 import { BatchDto } from './dto/batch.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
-import { PaymentDiscountType, PaymentMethod, Prisma } from '../../generated/prisma-client';
+import {
+  PaymentDiscountType,
+  PaymentMethod,
+  Prisma,
+} from '../../generated/prisma-client';
 import { PrismaClientKnownRequestError } from '../../generated/prisma-client/runtime/library';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
 import { DrawerOrderKey } from './dto/drawers-query.dto';
-import { AddDrawerEntryDto, DrawerType } from './dto/add-drawer-entry.dto';
-import { StockApplyMissingDto, StockApplyResultDto, StockApplyUpdatedDto, StockApplyWarnDto, UpdateStockFromInvoicesPayloadDto } from './dto/stock-apply.dto';
+import {
+  StockApplyMissingDto,
+  StockApplyResultDto,
+  StockApplyUpdatedDto,
+  StockApplyWarnDto,
+  UpdateStockFromInvoicesPayloadDto,
+} from './dto/stock-apply.dto';
 import { QueryDrawersDto } from './dto/query-drawers.dto';
 import { InsertDrawerDto } from './dto/insert-drawer.dto';
 
@@ -22,13 +36,8 @@ import { InsertDrawerDto } from './dto/insert-drawer.dto';
 export class CashierService {
   constructor(private readonly prisma: PrismaService) {}
 
-
-//   -----------------------------------------------------------------------------------------------
-
-
-// getCategoriesWithItemsAndBatches
-
-
+  // -----------------------------------------------------------------------------------------------
+  // getCategoriesWithItemsAndBatches
 
   async getCategoriesWithItemsAndBatches(): Promise<CategoryCatalogDto[]> {
     const categories = await this.prisma.category.findMany({
@@ -46,10 +55,10 @@ export class CashierService {
       },
     });
 
-    const out: CategoryCatalogDto[] = []; // 
-    
+    const out: CategoryCatalogDto[] = [];
+
     for (const c of categories) {
-      const items: ItemDto[] = []; // 
+      const items: ItemDto[] = [];
 
       for (const i of c.items) {
         if (!i.stock || i.stock.length === 0) continue;
@@ -60,7 +69,7 @@ export class CashierService {
           price: s.sellPrice,
           quantity: s.quantity,
           discountAmount: s.discountAmount,
-        })); // ✅ explicitly typed
+        }));
 
         const item: ItemDto = {
           id: i.id,
@@ -89,16 +98,12 @@ export class CashierService {
     return out;
   }
 
+  // -------------------------------------------------------------------------------------------
+  // Get All Payment Records
 
-
-//   -------------------------------------------------------------------------------------------
-
-
-// Get All Payemnt Records
-
-async getAllPayments(): Promise<PaymentRecordDto[]> {
+  async getAllPayments(): Promise<PaymentRecordDto[]> {
     const rows = await this.prisma.payment.findMany({
-      orderBy: { date: 'desc' }, // newest first
+      orderBy: { date: 'desc' },
       select: {
         id: true,
         amount: true,
@@ -114,13 +119,12 @@ async getAllPayments(): Promise<PaymentRecordDto[]> {
       },
     });
 
-    // Map Prisma (camelCase/enums/BigInt) -> Flutter (snake_case/strings/number)
     return rows.map((p) => {
-      // date is BigInt in Prisma schema -> number (ms epoch)
       const dateNum =
-        typeof p.date === 'bigint' ? Number(p.date) : (p.date as unknown as number);
+        typeof p.date === 'bigint'
+          ? Number(p.date)
+          : (p.date as unknown as number);
 
-      // Map enums to Flutter strings
       const typeStr = p.type === 'CASH' ? 'Cash' : 'Card';
       const discountStr =
         p.discountType === 'NO'
@@ -147,21 +151,16 @@ async getAllPayments(): Promise<PaymentRecordDto[]> {
     });
   }
 
+  // ----------------------------------------------------------------------------------------------
 
-
-
-//   ----------------------------------------------------------------------------------------------
-
-
-
-
-
-async insertPayment(dto: CreatePaymentDto): Promise<PaymentRecordDto> {
+  async insertPayment(dto: CreatePaymentDto): Promise<PaymentRecordDto> {
     const typeEnum: PaymentMethod = dto.type === 'Card' ? 'CARD' : 'CASH';
     const discountEnum: PaymentDiscountType =
-      dto.discount_type === 'percentage' ? 'PERCENTAGE'
-      : dto.discount_type === 'amount' ? 'AMOUNT'
-      : 'NO';
+      dto.discount_type === 'percentage'
+        ? 'PERCENTAGE'
+        : dto.discount_type === 'amount'
+        ? 'AMOUNT'
+        : 'NO';
 
     try {
       const created = await this.prisma.payment.create({
@@ -190,14 +189,15 @@ async insertPayment(dto: CreatePaymentDto): Promise<PaymentRecordDto> {
         user_id: created.userId ?? null,
         customer_contact: created.customerContact ?? null,
         discount_type:
-          created.discountType === 'PERCENTAGE' ? 'percentage'
-          : created.discountType === 'AMOUNT' ? 'amount'
-          : 'no',
+          created.discountType === 'PERCENTAGE'
+            ? 'percentage'
+            : created.discountType === 'AMOUNT'
+            ? 'amount'
+            : 'no',
         discount_value: created.discountValue,
       };
     } catch (err: any) {
       if (err?.code === 'P2002') {
-        // unique constraint (e.g., sale_invoice_id)
         throw new ConflictException('Duplicate value for unique field');
       }
       if (err?.code === 'P2003') {
@@ -207,16 +207,11 @@ async insertPayment(dto: CreatePaymentDto): Promise<PaymentRecordDto> {
     }
   }
 
- 
-//   ----------------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------------
 
-
-
-
-async insertInvoices(dto: CreateInvoicesDto): Promise<{ count: number }> {
+  async insertInvoices(dto: CreateInvoicesDto): Promise<{ count: number }> {
     const saleId = dto.sale_invoice_id;
 
-    // Ensure payment (FK) exists, like your SQLite FK to payment(sale_invoice_id)
     const payment = await this.prisma.payment.findUnique({
       where: { saleInvoiceId: saleId },
       select: { saleInvoiceId: true },
@@ -228,19 +223,18 @@ async insertInvoices(dto: CreateInvoicesDto): Promise<{ count: number }> {
     }
 
     if (!dto.invoices?.length) {
-      // No-op, but keep behavior explicit
       return { count: 0 };
     }
 
-    // Validate lines minimally (item_id must be present)
     for (const inv of dto.invoices) {
       if (typeof inv.item_id !== 'number' || Number.isNaN(inv.item_id)) {
-        throw new BadRequestException('item_id is required and must be a number');
+        throw new BadRequestException(
+          'item_id is required and must be a number',
+        );
       }
     }
 
     try {
-      // Use a transaction to mimic "abort on any error"
       const result = await this.prisma.$transaction(async (tx) => {
         const data = dto.invoices.map((inv) => ({
           batchId: inv.batch_id,
@@ -252,7 +246,6 @@ async insertInvoices(dto: CreateInvoicesDto): Promise<{ count: number }> {
 
         const r = await tx.invoice.createMany({
           data,
-          // skipDuplicates: false  // default; fail if any unique/constraint violation
         });
 
         return r;
@@ -260,24 +253,18 @@ async insertInvoices(dto: CreateInvoicesDto): Promise<{ count: number }> {
 
       return { count: result.count };
     } catch (err: any) {
-      // Prisma codes: P2003(FK), P2002(unique), P2025(not found), etc.
       if (err?.code === 'P2003') {
-        throw new BadRequestException('Invalid relation (FK) while inserting invoices');
+        throw new BadRequestException(
+          'Invalid relation (FK) while inserting invoices',
+        );
       }
       throw new InternalServerErrorException('Failed to insert invoices');
     }
   }
 
+  // -------------------------------------------------------------------------------------------
 
-
-//   -------------------------------------------------------------------------------------------
-
-
-
-
-
-
-async getAllReturns(): Promise<Record<string, any>[]> {
+  async getAllReturns(): Promise<Record<string, any>[]> {
     try {
       const rows =
         await this.prisma.$queryRaw<Array<Record<string, any>>>`
@@ -289,41 +276,29 @@ async getAllReturns(): Promise<Record<string, any>[]> {
     }
   }
 
+  // ------------------------------------------------------------------------------------------
+  // Get Sale Bundle List
 
-
-
-
-//   ------------------------------------------------------------------------------------------
-
-
-
-
-
-// Get Sale Bundle List
-
-
-async getSaleBundleList(
+  async getSaleBundleList(
     saleInvoiceId: string,
   ): Promise<Array<Record<string, any>>> {
-    // 1) Payment header
     const p = await this.prisma.payment.findUnique({
       where: { saleInvoiceId },
       select: {
         saleInvoiceId: true,
         amount: true,
         remainAmount: true,
-        type: true, // enum: CASH|CARD
+        type: true,
         fileName: true,
-        date: true, // BigInt in Prisma -> string/number via Number()
+        date: true,
         userId: true,
         customerContact: true,
-        discountType: true, // enum: NO|PERCENTAGE|AMOUNT
+        discountType: true,
         discountValue: true,
       },
     });
 
     if (!p) {
-      // No such sale_invoice_id
       return [];
     }
 
@@ -334,9 +309,7 @@ async getSaleBundleList(
       payment_type: p.type === 'CARD' ? 'Card' : 'Cash',
       payment_file_name: p.fileName ?? null,
       payment_date:
-        typeof p.date === 'bigint'
-          ? Number(p.date)
-          : Number(p.date ?? 0),
+        typeof p.date === 'bigint' ? Number(p.date) : Number(p.date ?? 0),
       payment_user_id: p.userId ?? 0,
       customer_contact: p.customerContact ?? null,
       discount_type:
@@ -348,8 +321,6 @@ async getSaleBundleList(
       discount_value: Number(p.discountValue ?? 0),
     };
 
-    // 2) Invoice lines with joins & computed columns
-    // Keep SQL aligned with Flutter version
     const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
       Prisma.sql`
         SELECT
@@ -397,26 +368,16 @@ async getSaleBundleList(
       };
     });
 
-    // 3) header first, then lines
     return [header, ...lineMaps];
   }
 
-
-
-
   // ---------------------------------------------------------------------------------
 
-
-
-
   // -------------------- returns (rich) --------------------
-  
-  
-  
-  
   async getReturnsRich(): Promise<ReturnRichDto[]> {
     try {
-      const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
+      const rows =
+        await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
         SELECT
           r.id            AS return_id,
           r.batch_id      AS batch_id,
@@ -441,7 +402,6 @@ async getSaleBundleList(
       `);
 
       const out: ReturnRichDto[] = rows.map((row) => {
-        // created_at might be BIGINT/number/string -> coerce to number for Flutter
         const createdAt =
           typeof row.created_at === 'bigint'
             ? Number(row.created_at)
@@ -461,7 +421,8 @@ async getSaleBundleList(
           item: {
             id: Number(row.item_id),
             name: String(row.item_name),
-            barcode: row.item_barcode == null ? null : String(row.item_barcode),
+            barcode:
+              row.item_barcode == null ? null : String(row.item_barcode),
             color_code: String(row.item_color_code),
           },
           quantity: Number(row.quantity),
@@ -474,27 +435,14 @@ async getSaleBundleList(
 
       return out;
     } catch (err) {
-      // You can branch on Prisma error codes if needed:
-      // if ((err as PrismaClientKnownRequestError).code === 'PXXXX') { ... }
       throw new InternalServerErrorException('Failed to fetch returns (rich).');
     }
   }
 
-
-
-
-
-
-
-
   // ------------------------------------------------------------------------------------------------
-
-
-  // INSERT RETURN 
-
+  // INSERT RETURN
 
   async insertReturn(dto: CreateReturnDto): Promise<{ id: number }> {
-    // ---- Coercions / validations (server-side, mirrors Flutter) ----
     const userId = Number(dto.user_id);
     const batchId = String(dto.batch_id ?? '').trim();
     const itemId = Number(dto.item_id);
@@ -502,7 +450,6 @@ async getSaleBundleList(
     const unitSaledPrice = Number(dto.unit_saled_price);
     const saleInvoiceId = String(dto.sale_invoice_id ?? '').trim();
 
-    // created_at: accept int millis or ISO-8601 string; otherwise now()
     let createdAtMs: number;
     const createdRaw = dto.created_at;
     if (typeof createdRaw === 'number') {
@@ -520,7 +467,11 @@ async getSaleBundleList(
     if (!Number.isFinite(userId) || userId <= 0) {
       throw new BadRequestException('user_id is required and must be > 0');
     }
-    if (!batchId) throw new BadRequestException('batch_id is required and must be non-empty');
+    if (!batchId) {
+      throw new BadRequestException(
+        'batch_id is required and must be non-empty',
+      );
+    }
     if (!Number.isFinite(itemId) || itemId <= 0) {
       throw new BadRequestException('item_id is required and must be > 0');
     }
@@ -531,10 +482,11 @@ async getSaleBundleList(
       throw new BadRequestException('unit_saled_price must be >= 0');
     }
     if (!saleInvoiceId) {
-      throw new BadRequestException('sale_invoice_id is required and must be non-empty');
+      throw new BadRequestException(
+        'sale_invoice_id is required and must be non-empty',
+      );
     }
 
-    // ---- Insert using raw SQL (no Prisma model for "return") ----
     try {
       const castBigInt = Prisma.sql`${createdAtMs}::bigint`;
       const rows = await this.prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
@@ -551,32 +503,24 @@ async getSaleBundleList(
       }
       return { id: created.id };
     } catch (err: any) {
-      // Prisma error mapping (raw queries may not always carry codes, but handle known cases)
       const code = (err as PrismaClientKnownRequestError)?.code;
       if (code === 'P2003') {
-        // FK violation (e.g., user_id/item_id/sale_invoice_id not matching)
-        throw new BadRequestException('Invalid relation (FK) while inserting return');
+        throw new BadRequestException(
+          'Invalid relation (FK) while inserting return',
+        );
       }
       if (code === 'P2002') {
-        // unique violation (if any unique constraints exist on the table)
-        throw new ConflictException('Duplicate value for unique field on return');
+        throw new ConflictException(
+          'Duplicate value for unique field on return',
+        );
       }
       throw new InternalServerErrorException('Failed to insert return');
     }
   }
 
-
-
-
-
-
   // ----------------------------------------------------------------------------------------
-
-
-
   // DELETE FROM "return" WHERE id = :id
-   
-  
+
   async deleteReturn(id: number): Promise<{ deleted: number }> {
     const rid = Number(id);
     if (!Number.isInteger(rid) || rid <= 0) {
@@ -584,119 +528,64 @@ async getSaleBundleList(
     }
 
     try {
-      // In Postgres, $executeRaw returns the number of affected rows.
       const affected = await this.prisma.$executeRaw(
-        Prisma.sql`DELETE FROM "return" WHERE id = ${rid}`
+        Prisma.sql`DELETE FROM "return" WHERE id = ${rid}`,
       );
 
       if (!affected) {
         throw new NotFoundException(`Return id=${rid} not found`);
       }
-      return { deleted: affected }; // typically 1
+      return { deleted: affected };
     } catch (err) {
       throw new InternalServerErrorException('Failed to delete return');
     }
   }
 
-
-
   // --------------------------------------------------------------------------------------------------
 
-
-
-  
-
   // PATCH "return".is_done by id
-  async toggleReturnDone(id: number, dto: UpdateReturnDoneDto): Promise<{ updated: number }> {
+  async toggleReturnDone(
+    id: number,
+    dto: UpdateReturnDoneDto,
+  ): Promise<{ updated: number }> {
     const rid = Number(id);
     if (!Number.isInteger(rid) || rid <= 0) {
       throw new BadRequestException('id must be a positive integer');
     }
 
-    // Convert boolean -> 0/1 to match your schema
     const flag = dto.is_done ? 1 : 0;
 
     try {
       const affected = await this.prisma.$executeRaw(
-        Prisma.sql`UPDATE "return" SET is_done = ${flag} WHERE id = ${rid}`
+        Prisma.sql`UPDATE "return" SET is_done = ${flag} WHERE id = ${rid}`,
       );
 
       if (!affected) {
         throw new NotFoundException(`Return id=${rid} not found`);
       }
-      return { updated: affected }; // typically 1
+      return { updated: affected };
     } catch (err) {
       throw new InternalServerErrorException('Failed to update is_done');
     }
   }
-  
-
-
-
-
 
   // --------------------------------------------------------------------------------
 
-
-
-  // DELETE FROM "return";  -> returns how many rows were removed
+  // DELETE FROM "return";
   async clearAllReturns(): Promise<{ deleted: number }> {
     try {
       const affected = await this.prisma.$executeRaw(
-        Prisma.sql`DELETE FROM "return"`
+        Prisma.sql`DELETE FROM "return"`,
       );
-      return { deleted: affected }; // e.g., 0..N
+      return { deleted: affected };
     } catch {
       throw new InternalServerErrorException('Failed to clear returns');
     }
   }
 
-
   // -------------------------------------------------------------------------------
-
-
-
-
-
-  // SELECT * FROM "drawer" WHERE user_id = ? ORDER BY date DESC
-  async getDrawerByUser(userId: number): Promise<Record<string, any>[]> {
-    const uid = Number(userId);
-    if (!Number.isInteger(uid) || uid <= 0) {
-      throw new BadRequestException('userId must be a positive integer');
-    }
-
-    try {
-      const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
-        SELECT * FROM "drawer"
-        WHERE user_id = ${uid}
-        ORDER BY date DESC
-      `);
-
-      // Ensure JSON-safe output (Postgres BIGINT -> number)
-      return rows.map((r) => {
-        const out: Record<string, any> = {};
-        for (const k of Object.keys(r)) {
-          const v = (r as any)[k];
-          out[k] = typeof v === 'bigint' ? Number(v) : v;
-        }
-        return out;
-      });
-    } catch {
-      // Parity with Flutter: swallow errors and return []
-      return [];
-    }
-  }
-
-
-
-
-
-  // -------------------------------------------------------------------------------------
-
-
-
-
   // SELECT * FROM "drawer" WHERE user_id = ? [AND date range] ORDER BY date DESC
+
   async getDrawersByUserId(
     userId: number,
     todayOnly = false,
@@ -706,7 +595,6 @@ async getSaleBundleList(
       throw new BadRequestException('userId must be a positive integer');
     }
 
-    // Optional "today" window (local server time) in epoch-ms
     let startMs: number | null = null;
     let endMs: number | null = null;
     if (todayOnly) {
@@ -733,30 +621,23 @@ async getSaleBundleList(
           `,
     );
 
-    // Convert any bigint fields to number for JSON safety
     return rows.map((r) => {
       const o: Record<string, any> = {};
       for (const k of Object.keys(r)) {
         const v = (r as any)[k];
         o[k] = typeof v === 'bigint' ? Number(v) : v;
-        // If your drawer.date is BIGINT, it will now be a JS number.
       }
       return o;
     });
   }
 
-
   // --------------------------------------------------------------------------
+  // hasDrawersByUserId
 
-
-
-
-
-
-
-
-  // ---------- hasDrawersByUserId ----------
-  async hasDrawersByUserId(userId: number, todayOnly = false): Promise<{ has: boolean }> {
+  async hasDrawersByUserId(
+    userId: number,
+    todayOnly = false,
+  ): Promise<{ has: boolean }> {
     const uid = Number(userId);
     if (!Number.isInteger(uid) || uid <= 0) {
       throw new BadRequestException('userId must be a positive integer');
@@ -772,9 +653,7 @@ async getSaleBundleList(
       endMs = end.getTime();
     }
 
-    const row = await this.prisma.$queryRaw<
-      Array<{ cnt: bigint }>
-    >(
+    const row = await this.prisma.$queryRaw<Array<{ cnt: bigint }>>(
       todayOnly
         ? Prisma.sql`
             SELECT COUNT(*)::bigint AS cnt
@@ -794,81 +673,9 @@ async getSaleBundleList(
     return { has: Number(cnt) > 0 };
   }
 
-
-
-
-
-
   // ----------------------------------------------------------------------------------------------------------------------
+  // getLatestShopById
 
-
-
-
-
-  // ---------- addDrawerEntry ----------
-  async addDrawerEntry(dto: AddDrawerEntryDto): Promise<{ id: number }> {
-    const amount = Number(dto.amount);
-    const userId = Number(dto.user_id);
-    const type = String(dto.type) as DrawerType;
-    const reason = (dto.reason ?? 'Opening float').toString();
-
-    let whenMs: number;
-    const w = dto.when;
-    if (typeof w === 'number') {
-      whenMs = w;
-    } else if (typeof w === 'string') {
-      const parsed = Date.parse(w);
-      if (Number.isNaN(parsed)) {
-        throw new BadRequestException('Invalid "when" date string');
-      }
-      whenMs = parsed;
-    } else {
-      whenMs = Date.now();
-    }
-
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException('amount must be a positive number');
-    }
-    if (!Number.isInteger(userId) || userId <= 0) {
-      throw new BadRequestException('user_id must be a positive integer');
-    }
-    if (type !== 'IN' && type !== 'OUT') {
-      throw new BadRequestException('type must be either IN or OUT');
-    }
-
-    try {
-      const rows = await this.prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
-        INSERT INTO "drawer" ("amount","date","reason","type","user_id")
-        VALUES (${amount}, ${Prisma.sql`${whenMs}::bigint`}, ${reason}, ${type}, ${userId})
-        RETURNING id
-      `);
-      const created = rows?.[0];
-      if (!created) throw new InternalServerErrorException('Insert did not return id');
-      return { id: created.id };
-    } catch (err: any) {
-      const code = (err as PrismaClientKnownRequestError)?.code;
-      if (code === 'P2003') {
-        throw new BadRequestException('Invalid relation (user_id) for drawer entry');
-      }
-      throw new InternalServerErrorException('Failed to insert drawer entry');
-    }
-  }
-
-
-
-
-
-
-  // -------------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
-
-  // ---------- getLatestShopById ----------
   async getLatestShopById(): Promise<Record<string, any> | null> {
     const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
       SELECT * FROM "shop"
@@ -877,7 +684,6 @@ async getSaleBundleList(
     `);
     if (!rows?.length) return null;
 
-    // normalize bigint -> number for JSON
     const r = rows[0];
     const out: Record<string, any> = {};
     for (const k of Object.keys(r)) {
@@ -887,16 +693,9 @@ async getSaleBundleList(
     return out;
   }
 
-
-
   // ---------------------------------------------------------------------------------------------------------------
+  // getDrawersByUserIdPaged
 
-
-
-
-
-
-  // ---------- getDrawersByUserId (paginated + order) ----------
   async getDrawersByUserIdPaged(
     userId: number,
     limit?: number,
@@ -908,7 +707,6 @@ async getSaleBundleList(
       throw new BadRequestException('userId must be a positive integer');
     }
 
-    // Whitelisted ORDER BY
     const orderSql =
       orderBy === 'date_asc_id_asc'
         ? Prisma.sql`ORDER BY date ASC, id ASC`
@@ -925,9 +723,13 @@ async getSaleBundleList(
 
     const rows =
       lim !== undefined && off !== undefined
-        ? await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`${base} LIMIT ${lim} OFFSET ${off}`)
+        ? await this.prisma.$queryRaw<Array<Record<string, any>>>(
+            Prisma.sql`${base} LIMIT ${lim} OFFSET ${off}`,
+          )
         : lim !== undefined
-        ? await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`${base} LIMIT ${lim}`)
+        ? await this.prisma.$queryRaw<Array<Record<string, any>>>(
+            Prisma.sql`${base} LIMIT ${lim}`,
+          )
         : await this.prisma.$queryRaw<Array<Record<string, any>>>(base);
 
     return rows.map((r) => {
@@ -940,17 +742,7 @@ async getSaleBundleList(
     });
   }
 
-
-
-
   // --------------------------------------------------------------------------------------------------
-
-
-
-
-
-
-
   /**
    * Mirrors Flutter updateStockFromInvoicesPayload:
    * - payload.invoices: [{ batch_id/batchId, item_id/itemId, quantity }]
@@ -970,7 +762,6 @@ async getSaleBundleList(
     const warnings: StockApplyWarnDto[] = [];
     const missing: StockApplyMissingDto[] = [];
 
-    // One transaction for the whole batch
     try {
       await this.prisma.$transaction(async (tx) => {
         for (const raw of invoices) {
@@ -989,7 +780,6 @@ async getSaleBundleList(
               ? Math.trunc(qtyRaw)
               : parseInt(String(qtyRaw ?? ''), 10) || 0;
 
-          // Validate
           if (!batchId || itemId < 0 || qtyReq <= 0) {
             warnings.push({
               batch_id: batchId,
@@ -1001,7 +791,6 @@ async getSaleBundleList(
             continue;
           }
 
-          // Special case: item_id == 0 => quick sale/service; no stock deduction
           if (itemId === 0) {
             updated.push({
               batch_id: batchId,
@@ -1012,7 +801,6 @@ async getSaleBundleList(
             continue;
           }
 
-          // Atomic deduct if enough quantity
           const affected = await tx.$executeRaw(
             Prisma.sql`
               UPDATE "stock"
@@ -1032,7 +820,6 @@ async getSaleBundleList(
             continue;
           }
 
-          // Not affected: check if row exists
           const rows = await tx.$queryRaw<Array<{ quantity: number }>>(Prisma.sql`
             SELECT quantity FROM "stock"
             WHERE batch_id = ${batchId} AND item_id = ${itemId}
@@ -1058,39 +845,26 @@ async getSaleBundleList(
           }
         }
 
-        // Rollback if requested and we encountered any issue
         if (allOrNothing && (warnings.length > 0 || missing.length > 0)) {
-          // throwing inside $transaction triggers a rollback
           throw new Error('ROLLBACK_STOCK_UPDATE');
         }
       });
-    } catch (e) {
-      // If allOrNothing=true and there were issues, we already rolled back.
-      // We still return the collected warnings/missing like the Flutter version.
-      // If you want to differentiate errors, you can inspect e.message / Prisma codes.
+    } catch {
+      // For allOrNothing, rollback happens but we still return collected issues
     }
 
     return { updated, warnings, missing };
   }
 
-
-
-
-
   // -----------------------------------------------------------------------------------------------------------------
+  // INSERT drawer
 
-
-
-
-
-  // ---------- INSERT ----------
   async insertDrawer(dto: InsertDrawerDto): Promise<{ id: number }> {
     const amount = Number(dto.amount);
     const reason = String(dto.reason ?? '').trim();
     const type = String(dto.type ?? '').trim();
     const userId = Number(dto.user_id);
 
-    // date: epoch ms or ISO; default now()
     let whenMs: number;
     if (typeof dto.date === 'number') {
       whenMs = dto.date;
@@ -1102,11 +876,20 @@ async getSaleBundleList(
       whenMs = Date.now();
     }
 
-    if (!Number.isFinite(amount)) throw new BadRequestException('amount must be a finite number');
-    if (!reason) throw new BadRequestException('reason is required and must be non-empty');
-    if (!type) throw new BadRequestException('type is required and must be non-empty');
-    if (!Number.isInteger(userId) || userId <= 0)
+    if (!Number.isFinite(amount)) {
+      throw new BadRequestException('amount must be a finite number');
+    }
+    if (!reason) {
+      throw new BadRequestException(
+        'reason is required and must be non-empty',
+      );
+    }
+    if (!type) {
+      throw new BadRequestException('type is required and must be non-empty');
+    }
+    if (!Number.isInteger(userId) || userId <= 0) {
       throw new BadRequestException('user_id is required and must be > 0');
+    }
 
     try {
       const rows = await this.prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
@@ -1118,26 +901,29 @@ async getSaleBundleList(
       if (!created) throw new InternalServerErrorException('Insert failed');
       return { id: created.id };
     } catch {
-      // Likely FK error for user_id, etc.
       throw new InternalServerErrorException('Failed to insert drawer row');
     }
   }
 
-  // ---------- GET ALL (with optional filters) ----------
+  // GET ALL drawers (with optional filters)
   async getAllDrawers(q: QueryDrawersDto): Promise<Record<string, any>[]> {
-    const parts: Prisma.Sql[] = [];
     const whereClauses: Prisma.Sql[] = [];
 
     if (q.userId) whereClauses.push(Prisma.sql`user_id = ${q.userId}`);
     if (q.type) whereClauses.push(Prisma.sql`type = ${q.type}`);
-    if (q.dateFromMillis) whereClauses.push(Prisma.sql`date >= ${Prisma.sql`${q.dateFromMillis}::bigint`}`);
-    if (q.dateToMillis) whereClauses.push(Prisma.sql`date <= ${Prisma.sql`${q.dateToMillis}::bigint`}`);
+    if (q.dateFromMillis)
+      whereClauses.push(
+        Prisma.sql`date >= ${Prisma.sql`${q.dateFromMillis}::bigint`}`,
+      );
+    if (q.dateToMillis)
+      whereClauses.push(
+        Prisma.sql`date <= ${Prisma.sql`${q.dateToMillis}::bigint`}`,
+      );
 
     const whereSql =
-  whereClauses.length > 0
-    ? Prisma.sql`WHERE ${Prisma.join(whereClauses, ' AND ')}`
-    : Prisma.empty;
-
+      whereClauses.length > 0
+        ? Prisma.sql`WHERE ${Prisma.join(whereClauses, ' AND ')}`
+        : Prisma.empty;
 
     const orderSql: Prisma.Sql =
       (q.orderBy ?? 'date_desc_id_desc') === 'date_asc_id_asc'
@@ -1163,7 +949,6 @@ async getSaleBundleList(
       rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(base);
     }
 
-    // normalize bigint -> number
     return rows.map((r) => {
       const o: Record<string, any> = {};
       for (const k of Object.keys(r)) {
@@ -1174,14 +959,18 @@ async getSaleBundleList(
     });
   }
 
-  // ---------- GET BY ROW ID ----------
+  // GET drawer by id
   async getDrawerById(id: number): Promise<Record<string, any> | null> {
     const rid = Number(id);
-    if (!Number.isInteger(rid) || rid <= 0) throw new BadRequestException('id must be > 0');
+    if (!Number.isInteger(rid) || rid <= 0) {
+      throw new BadRequestException('id must be > 0');
+    }
 
-    const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
+    const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
+      Prisma.sql`
       SELECT * FROM "drawer" WHERE id = ${rid} LIMIT 1
-    `);
+    `,
+    );
     if (!rows?.length) return null;
 
     const r = rows[0];
@@ -1192,10 +981,4 @@ async getSaleBundleList(
     }
     return out;
   }
-
-
-
-
-  
-
 }
