@@ -72,7 +72,7 @@ export class StockController {
   // --- CATEGORY: Create with image (file OR base64) ---
   @Post('categories')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new category (supports image upload or base64)' })
   @ApiConsumes('multipart/form-data')
@@ -135,7 +135,7 @@ export class StockController {
   // --- ITEM: Create (with optional image) ---
   @Post('items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create a new item (with optional initial stock & image)' })
   @ApiConsumes('multipart/form-data')
@@ -212,7 +212,7 @@ export class StockController {
   // --- PURCHASE: Create Stock ---
   @Post('purchase')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Create stock for existing item' })
   @ApiCreatedResponse({ description: 'Stock created.' })
@@ -251,7 +251,7 @@ export class StockController {
   // --- CATEGORY: List ---
   @Get('categories')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER','CASHIER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'List all categories' })
   @ApiUnauthorizedResponse({description:'Missing/Invalid JWT.'})
@@ -280,7 +280,7 @@ export class StockController {
   // --- ITEMS: List with summaries ---
   @Get('items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER', 'MANAGER', 'ADMIN')
+  @Roles('STOCKKEEPER', 'MANAGER', 'CASHIER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'List items with category, creator, qty, weighted prices, status & total',
@@ -421,7 +421,7 @@ async listEnabledItems(): Promise<GetAllItemsDto[]> {
 
 @Get('restock/lookup')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('STOCKKEEPER')
+@Roles('STOCKKEEPER','MANAGER')
 @ApiBearerAuth('JWT-auth')
 @ApiOperation({
   summary: 'Lookup item for restock by id | name | barcode',
@@ -455,7 +455,7 @@ async lookupForRestock(
 
 @Post('restock/:id')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles('STOCKKEEPER')
+@Roles('STOCKKEEPER','MANAGER')
 @ApiBearerAuth('JWT-auth')
 @ApiOperation({
   summary: 'Restock an item',
@@ -502,7 +502,7 @@ async restockItem(
 
 @Get('low-stock/items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'List items at or below reorder level',

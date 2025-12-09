@@ -1,11 +1,38 @@
 // src/manager/dto/update-manager.dto.ts
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateManagerDto } from './create-manager.dto';
-import { IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
-export class UpdateManagerDto extends PartialType(CreateManagerDto) {
+// Allow updating core profile fields plus password (all optional)
+export class UpdateManagerDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  contact?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(6)
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  colorCode?: string;
 }

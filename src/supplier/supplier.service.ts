@@ -1,3 +1,4 @@
+// supplier/supplier.service.ts
 import {
   BadRequestException,
   ConflictException,
@@ -6,9 +7,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { PrismaClientKnownRequestError } from '../../generated/prisma-client/runtime/library';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
+import { SupplierStatus } from '../../generated/prisma-client';
 
 @Injectable()
 export class SupplierService {
@@ -16,23 +18,25 @@ export class SupplierService {
     private readonly prisma: PrismaService,
   ) {}
 
-
   async createSupplier(dto: CreateSupplierDto, userId?: number) {
     try {
-      const color = 
-      dto.colorCode
-      ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#{dto.colorCode}`).toUpperCase() 
-      : '#000000';
+      const color = dto.colorCode
+        ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#${dto.colorCode}`).toUpperCase()
+        : '#000000';
 
       return await this.prisma.supplier.create({
         data: {
-          name:dto.name,
+          name: dto.name,
           brand: dto.brand,
           contact: dto.contact,
           email: dto.email ?? null,
+          address: dto.address ?? null,
           location: dto.location ?? null,
           notes: dto.notes ?? null,
           colorCode: color,
+          status: dto.status ?? SupplierStatus.ACTIVE,
+          preferred: dto.preferred ? 1 : 0, // Convert boolean to int (since preferred is Int in schema)
+          active: dto.active ?? true, // Use boolean directly (since active is Boolean in schema)
           createdById: userId ?? null,
         },
       });
@@ -42,58 +46,59 @@ export class SupplierService {
     }
   }
 
-
   async listSuppliers() {
     return this.prisma.supplier.findMany({
-      orderBy: [{ name: 'asc'}, { brand: 'asc'}],
+      orderBy: [{ name: 'asc' }, { brand: 'asc' }],
     });
   }
 
-// ---------------------------------------------------------------------------------------------------------------
-  
-
-  // Supplier : Get by ID
- 
   async getSupplierById(id: number) {
-    const supplier = await this.prisma.supplier.findUnique({ where: {id} });
+    const supplier = await this.prisma.supplier.findUnique({ where: { id } });
     if (!supplier) throw new NotFoundException(`Supplier ${id} not found`);
     return supplier;
   }
 
-  // -------------------------------------------------------------------------------------------------------------
-
-
-
-  // === SUPPLIER: Update (optional) ===
   async updateSupplier(id: number, dto: UpdateSupplierDto, userId?: number) {
     // ensure exists
     await this.getSupplierById(id);
 
-    const color =
-      dto.colorCode
-        ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#${dto.colorCode}`).toUpperCase()
-        : undefined;
+    const color = dto.colorCode
+      ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#${dto.colorCode}`).toUpperCase()
+      : undefined;
 
     try {
+      const updateData: any = {
+        name: dto.name,
+        brand: dto.brand,
+        contact: dto.contact,
+        email: dto.email,
+        address: dto.address,
+        location: dto.location,
+        notes: dto.notes,
+        colorCode: color,
+        updatedById: userId ?? null,
+      };
+
+      // Only include these fields if they are provided
+      if (dto.status !== undefined) {
+        updateData.status = dto.status;
+      }
+      if (dto.preferred !== undefined) {
+        updateData.preferred = dto.preferred ? 1 : 0; // Convert boolean to int
+      }
+      if (dto.active !== undefined) {
+        updateData.active = dto.active; // Use boolean directly
+      }
+
       return await this.prisma.supplier.update({
         where: { id },
-        data: {
-          name: dto.name,
-          brand: dto.brand,
-          contact: dto.contact,
-          email: dto.email,
-          location: dto.location,
-          notes: dto.notes,
-          colorCode: color,
-          updatedById: userId ?? null,
-        },
+        data: updateData,
       });
     } catch (err) {
       this.handlePrismaError(err, 'updateSupplier');
     }
   }
 
-  // === SUPPLIER: Delete (optional) ===
   async deleteSupplier(id: number) {
     try {
       return await this.prisma.supplier.delete({ where: { id } });
@@ -101,12 +106,6 @@ export class SupplierService {
       this.handlePrismaError(err, 'deleteSupplier');
     }
   }
-
-
-  
-
-  // ---------------------------------------------------------------------------------------------------------------
-  // ---- Helpers ----
 
   private async ensureSupplierExists(supplierId: number) {
     const exists = await this.prisma.supplier.findUnique({
@@ -136,6 +135,4 @@ export class SupplierService {
     }
     throw new InternalServerErrorException('Unexpected error occurred');
   }
-
-
 }
