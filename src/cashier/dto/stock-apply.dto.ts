@@ -9,12 +9,10 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-// -------- Request DTOs --------
-
 export class UpdateStockFromInvoicesLineDto {
   @ApiProperty({ example: 'BATCH-AMBUN-001' })
   @IsString()
-  batch_id: string; // or batchId on frontend – service accepts both
+  batch_id: string;
 
   @ApiProperty({ example: 3, description: 'item_id; 0 = quick sale / service' })
   @IsInt()
@@ -39,8 +37,6 @@ export class UpdateStockFromInvoicesPayloadDto {
   invoices: UpdateStockFromInvoicesLineDto[];
 }
 
-// -------- Response DTOs --------
-
 export class StockApplyUpdatedDto {
   @ApiProperty({ example: 'BATCH-AMBUN-001' })
   batch_id: string;
@@ -51,10 +47,7 @@ export class StockApplyUpdatedDto {
   @ApiProperty({ example: 2, description: 'Actually deducted from stock' })
   deducted: number;
 
-  @ApiProperty({
-    example: 'item_id=0 Quick sale',
-    required: false,
-  })
+  @ApiProperty({ example: 'item_id=0 Quick sale', required: false })
   @IsOptional()
   note?: string;
 }

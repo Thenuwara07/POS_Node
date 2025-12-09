@@ -36,9 +36,36 @@ import { InsertDrawerDto } from './dto/insert-drawer.dto';
 export class CashierService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // -----------------------------------------------------------------------------------------------
-  // getCategoriesWithItemsAndBatches
+  private async generateNextSaleInvoiceId(
+    prisma: PrismaService | Prisma.TransactionClient = this.prisma,
+  ): Promise<string> {
+    const latest = await prisma.payment.findFirst({
+      where: { saleInvoiceId: { not: null } },
+      select: { saleInvoiceId: true },
+      orderBy: { id: 'desc' },
+    });
 
+    const last = latest?.saleInvoiceId ?? '';
+
+    const yearMatch = /^INV-(\d{4})-(\d+)$/i.exec(last);
+    if (yearMatch) {
+      const year = yearMatch[1];
+      const seq = parseInt(yearMatch[2], 10) + 1;
+      const width = yearMatch[2].length;
+      return `INV-${year}-${seq.toString().padStart(width, '0')}`;
+    }
+
+    const simpleMatch = /^INV-(\d+)$/i.exec(last);
+    if (simpleMatch) {
+      const seq = parseInt(simpleMatch[1], 10) + 1;
+      const width = Math.max(3, simpleMatch[1].length);
+      return `INV-${seq.toString().padStart(width, '0')}`;
+    }
+
+    return 'INV-001';
+  }
+
+  // Catalog with items/batches
   async getCategoriesWithItemsAndBatches(): Promise<CategoryCatalogDto[]> {
     const categories = await this.prisma.category.findMany({
       orderBy: { id: 'asc' },
@@ -98,9 +125,6 @@ export class CashierService {
     return out;
   }
 
-  // -------------------------------------------------------------------------------------------
-  // Get All Payment Records
-
   async getAllPayments(): Promise<PaymentRecordDto[]> {
     const rows = await this.prisma.payment.findMany({
       orderBy: { date: 'desc' },
@@ -133,7 +157,7 @@ export class CashierService {
           ? 'percentage'
           : 'amount';
 
-      const rec: PaymentRecordDto = {
+      return {
         id: p.id,
         amount: p.amount,
         remain_amount: p.remainAmount,
@@ -146,12 +170,8 @@ export class CashierService {
         discount_type: discountStr,
         discount_value: p.discountValue,
       };
-
-      return rec;
     });
   }
-
-  // ----------------------------------------------------------------------------------------------
 
   async insertPayment(dto: CreatePaymentDto): Promise<PaymentRecordDto> {
     const typeEnum: PaymentMethod = dto.type === 'Card' ? 'CARD' : 'CASH';
@@ -162,6 +182,11 @@ export class CashierService {
         ? 'AMOUNT'
         : 'NO';
 
+    let saleInvoiceId = (dto.sale_invoice_id ?? '').trim();
+    if (!saleInvoiceId) {
+      saleInvoiceId = await this.generateNextSaleInvoiceId();
+    }
+
     try {
       const created = await this.prisma.payment.create({
         data: {
@@ -170,7 +195,7 @@ export class CashierService {
           date: BigInt(dto.date),
           fileName: dto.file_name,
           type: typeEnum,
-          saleInvoiceId: dto.sale_invoice_id,
+          saleInvoiceId,
           userId: dto.user_id ?? null,
           customerContact: dto.customer_contact ?? null,
           discountType: discountEnum,
@@ -207,8 +232,6 @@ export class CashierService {
     }
   }
 
-  // ----------------------------------------------------------------------------------
-
   async insertInvoices(dto: CreateInvoicesDto): Promise<{ count: number }> {
     const saleId = dto.sale_invoice_id;
 
@@ -236,16 +259,79 @@ export class CashierService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
-        const data = dto.invoices.map((inv) => ({
-          batchId: inv.batch_id,
-          itemId: inv.item_id,
-          quantity: inv.quantity,
-          unitSaledPrice: inv.unit_saled_price,
-          saleInvoiceId: saleId,
-        }));
+        const data: Array<{
+          batchId: string;
+          itemId: number;
+          quantity: number;
+          unitSaledPrice: number;
+          saleInvoiceId: string;
+        }> = [];
+
+        for (const inv of dto.invoices) {
+          const qty = Number(inv.quantity ?? 0);
+          const batchId = String(inv.batch_id ?? '').trim();
+          const itemId = Number(inv.item_id);
+
+          if (!batchId) {
+            throw new BadRequestException(
+              'batch_id is required and must be non-empty',
+            );
+          }
+          if (!Number.isFinite(qty) || qty < 1) {
+            throw new BadRequestException('quantity must be >= 1');
+          }
+
+          let unitPrice = inv.unit_saled_price;
+          if (unitPrice == null || Number.isNaN(unitPrice)) {
+            const stock = await tx.stock.findFirst({
+              where: { batchId, itemId },
+              select: { sellPrice: true, discountAmount: true },
+            });
+            if (!stock) {
+              throw new BadRequestException(
+                `unit_saled_price missing and stock not found for batch_id=${batchId}, item_id=${itemId}`,
+              );
+            }
+            const discounted =
+              Number(stock.sellPrice ?? 0) -
+              Number(stock.discountAmount ?? 0);
+            unitPrice = discounted >= 0 ? discounted : 0;
+          }
+
+          const priceNum = Number(unitPrice);
+          if (!Number.isFinite(priceNum) || priceNum < 0) {
+            throw new BadRequestException(
+              `unit_saled_price invalid for batch_id=${batchId}, item_id=${itemId}`,
+            );
+          }
+
+          data.push({
+            batchId,
+            itemId,
+            quantity: Math.trunc(qty),
+            unitSaledPrice: priceNum,
+            saleInvoiceId: saleId,
+          });
+        }
 
         const r = await tx.invoice.createMany({
           data,
+        });
+
+        // Recalculate payment.amount from all invoices for this sale (fresh sum for accuracy)
+        const sumRows = await tx.$queryRaw<
+          Array<{ total: number | null }>
+        >(Prisma.sql`
+          SELECT COALESCE(SUM(unit_saled_price * quantity), 0) AS total
+          FROM "invoice"
+          WHERE sale_invoice_id = ${saleId}
+        `);
+
+        const totalAmount = Number(sumRows?.[0]?.total ?? 0);
+
+        await tx.payment.update({
+          where: { saleInvoiceId: saleId },
+          data: { amount: totalAmount },
         });
 
         return r;
@@ -262,8 +348,6 @@ export class CashierService {
     }
   }
 
-  // -------------------------------------------------------------------------------------------
-
   async getAllReturns(): Promise<Record<string, any>[]> {
     try {
       const rows =
@@ -271,13 +355,10 @@ export class CashierService {
           SELECT * FROM "return" ORDER BY created_at DESC
         `;
       return rows;
-    } catch (err) {
+    } catch {
       throw new InternalServerErrorException('Failed to fetch returns');
     }
   }
-
-  // ------------------------------------------------------------------------------------------
-  // Get Sale Bundle List
 
   async getSaleBundleList(
     saleInvoiceId: string,
@@ -298,9 +379,7 @@ export class CashierService {
       },
     });
 
-    if (!p) {
-      return [];
-    }
+    if (!p) return [];
 
     const header: Record<string, any> = {
       sale_invoice_id: p.saleInvoiceId?.toString(),
@@ -371,9 +450,6 @@ export class CashierService {
     return [header, ...lineMaps];
   }
 
-  // ---------------------------------------------------------------------------------
-
-  // -------------------- returns (rich) --------------------
   async getReturnsRich(): Promise<ReturnRichDto[]> {
     try {
       const rows =
@@ -434,13 +510,10 @@ export class CashierService {
       });
 
       return out;
-    } catch (err) {
+    } catch {
       throw new InternalServerErrorException('Failed to fetch returns (rich).');
     }
   }
-
-  // ------------------------------------------------------------------------------------------------
-  // INSERT RETURN
 
   async insertReturn(dto: CreateReturnDto): Promise<{ id: number }> {
     const userId = Number(dto.user_id);
@@ -518,9 +591,6 @@ export class CashierService {
     }
   }
 
-  // ----------------------------------------------------------------------------------------
-  // DELETE FROM "return" WHERE id = :id
-
   async deleteReturn(id: number): Promise<{ deleted: number }> {
     const rid = Number(id);
     if (!Number.isInteger(rid) || rid <= 0) {
@@ -536,14 +606,11 @@ export class CashierService {
         throw new NotFoundException(`Return id=${rid} not found`);
       }
       return { deleted: affected };
-    } catch (err) {
+    } catch {
       throw new InternalServerErrorException('Failed to delete return');
     }
   }
 
-  // --------------------------------------------------------------------------------------------------
-
-  // PATCH "return".is_done by id
   async toggleReturnDone(
     id: number,
     dto: UpdateReturnDoneDto,
@@ -564,14 +631,11 @@ export class CashierService {
         throw new NotFoundException(`Return id=${rid} not found`);
       }
       return { updated: affected };
-    } catch (err) {
+    } catch {
       throw new InternalServerErrorException('Failed to update is_done');
     }
   }
 
-  // --------------------------------------------------------------------------------
-
-  // DELETE FROM "return";
   async clearAllReturns(): Promise<{ deleted: number }> {
     try {
       const affected = await this.prisma.$executeRaw(
@@ -582,9 +646,6 @@ export class CashierService {
       throw new InternalServerErrorException('Failed to clear returns');
     }
   }
-
-  // -------------------------------------------------------------------------------
-  // SELECT * FROM "drawer" WHERE user_id = ? [AND date range] ORDER BY date DESC
 
   async getDrawersByUserId(
     userId: number,
@@ -631,9 +692,6 @@ export class CashierService {
     });
   }
 
-  // --------------------------------------------------------------------------
-  // hasDrawersByUserId
-
   async hasDrawersByUserId(
     userId: number,
     todayOnly = false,
@@ -673,9 +731,6 @@ export class CashierService {
     return { has: Number(cnt) > 0 };
   }
 
-  // ----------------------------------------------------------------------------------------------------------------------
-  // getLatestShopById
-
   async getLatestShopById(): Promise<Record<string, any> | null> {
     const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(Prisma.sql`
       SELECT * FROM "shop"
@@ -692,9 +747,6 @@ export class CashierService {
     }
     return out;
   }
-
-  // ---------------------------------------------------------------------------------------------------------------
-  // getDrawersByUserIdPaged
 
   async getDrawersByUserIdPaged(
     userId: number,
@@ -742,16 +794,6 @@ export class CashierService {
     });
   }
 
-  // --------------------------------------------------------------------------------------------------
-  /**
-   * Mirrors Flutter updateStockFromInvoicesPayload:
-   * - payload.invoices: [{ batch_id/batchId, item_id/itemId, quantity }]
-   * - Atomic deduct: UPDATE stock SET quantity = quantity - :q WHERE batch_id=:b AND item_id=:i AND quantity >= :q
-   * - If affected=1 -> updated[]
-   * - Else -> check row exists -> missing[] or warnings[] (insufficient)
-   * - item_id=0 => pass-through (no deduction) with note
-   * - Wrap in one transaction; if allOrNothing && (warnings|missing) -> rollback by throwing
-   */
   async updateStockFromInvoicesPayload(
     payload: UpdateStockFromInvoicesPayloadDto,
     allOrNothing = false,
@@ -850,14 +892,10 @@ export class CashierService {
         }
       });
     } catch {
-      // For allOrNothing, rollback happens but we still return collected issues
     }
 
     return { updated, warnings, missing };
   }
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // INSERT drawer
 
   async insertDrawer(dto: InsertDrawerDto): Promise<{ id: number }> {
     const amount = Number(dto.amount);
@@ -905,7 +943,6 @@ export class CashierService {
     }
   }
 
-  // GET ALL drawers (with optional filters)
   async getAllDrawers(q: QueryDrawersDto): Promise<Record<string, any>[]> {
     const whereClauses: Prisma.Sql[] = [];
 
@@ -959,7 +996,6 @@ export class CashierService {
     });
   }
 
-  // GET drawer by id
   async getDrawerById(id: number): Promise<Record<string, any> | null> {
     const rid = Number(id);
     if (!Number.isInteger(rid) || rid <= 0) {
