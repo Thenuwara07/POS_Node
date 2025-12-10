@@ -33,6 +33,7 @@ enum SupplierRequestStatus {
 enum PaymentMethod {
   CASH
   CARD
+  SPLIT
 }
 
 enum PaymentDiscountType {
@@ -189,6 +190,8 @@ model Payment {
   date            BigInt
   fileName        String              @map("file_name")
   type            PaymentMethod       @map("type")
+  cashAmount      Float               @default(0) @map("cash_amount")
+  cardAmount      Float               @default(0) @map("card_amount")
   saleInvoiceId   String?             @unique @map("sale_invoice_id")
   userId          Int?                @map("user_id")
   customerContact String?             @map("customer_contact")

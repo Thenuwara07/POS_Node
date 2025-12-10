@@ -38,6 +38,7 @@ import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
+import { CreateSaleDto } from './dto/create-sale.dto';
 import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
 import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
 import { QueryQuickSalesDto } from './dto/query-quick-sales.dto';
@@ -106,6 +107,60 @@ export class CashierController {
     return this.cashierService.insertPayment(dto);
   }
 
+  @Post('sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Create a sale in one call: payment (Cash/Card/Split) + invoices + optional auto stock deduction',
+  })
+  @ApiQuery({
+    name: 'applyStock',
+    required: false,
+    type: Boolean,
+    example: true,
+    description: 'Automatically deduct stock after invoices (default: true)',
+  })
+  @ApiQuery({
+    name: 'allOrNothing',
+    required: false,
+    type: Boolean,
+    example: false,
+    description: 'When true, stock deduction will rollback if any line fails',
+  })
+  @ApiBody({ type: CreateSaleDto })
+  @ApiCreatedResponse({
+    description: 'Sale created.',
+    schema: {
+      type: 'object',
+      properties: {
+        sale_invoice_id: { type: 'string', example: 'INV-001' },
+        payment: { type: 'object', additionalProperties: true },
+        invoices: {
+          type: 'object',
+          properties: { count: { type: 'number', example: 3 } },
+        },
+        stock: {
+          type: 'object',
+          properties: {
+            updated: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            warnings: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            missing: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  async createSale(
+    @Body() dto: CreateSaleDto,
+    @Query('applyStock', new ParseBoolPipe({ optional: true })) applyStock = true,
+    @Query('allOrNothing', new ParseBoolPipe({ optional: true })) allOrNothing = false,
+  ) {
+    return this.cashierService.createSale(dto, applyStock, allOrNothing);
+  }
+
   @Get('invoices')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CASHIER', 'MANAGER')
@@ -124,16 +179,44 @@ export class CashierController {
     summary:
       'Insert invoices for a sale_invoice_id (transactional; aborts on any error). If unit_saled_price omitted, uses stock.sell_price - discount_amount and updates payment.amount.',
   })
+  @ApiQuery({
+    name: 'applyStock',
+    required: false,
+    type: Boolean,
+    example: true,
+    description: 'Automatically deduct stock after creating invoices (default: true)',
+  })
+  @ApiQuery({
+    name: 'allOrNothing',
+    required: false,
+    type: Boolean,
+    example: false,
+    description: 'When true, stock deduction will rollback if any line is invalid',
+  })
   @ApiCreatedResponse({
     description: 'Invoices inserted.',
     schema: {
       type: 'object',
-      properties: { count: { type: 'number', example: 3 } },
+      properties: {
+        count: { type: 'number', example: 3 },
+        stock: {
+          type: 'object',
+          properties: {
+            updated: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            warnings: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            missing: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+      },
     },
   })
   @ApiBadRequestResponse({ description: 'Validation/Relation error.' })
-  async insertInvoices(@Body() dto: CreateInvoicesDto) {
-    return this.cashierService.insertInvoices(dto);
+  async insertInvoices(
+    @Body() dto: CreateInvoicesDto,
+    @Query('applyStock', new ParseBoolPipe({ optional: true })) applyStock = true,
+    @Query('allOrNothing', new ParseBoolPipe({ optional: true })) allOrNothing = false,
+  ) {
+    return this.cashierService.insertInvoices(dto, applyStock, allOrNothing);
   }
 
   @Post('quick-sales')
