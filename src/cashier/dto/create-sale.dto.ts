@@ -1,6 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform } from 'class-transformer';
-import { IsIn, IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsArray,
+  IsIn,
+  IsInt,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { InvoiceLineDto } from './invoice-line.dto';
 
 const toEpochMs = (v: any): number => {
   if (typeof v === 'number') return v;
@@ -28,12 +38,22 @@ const normDiscount = (v: unknown): 'no' | 'percentage' | 'amount' => {
   return 'no';
 };
 
-export class CreatePaymentDto {
-  @ApiProperty({ example: 1500.0 })
-  @Transform(({ value }) => Number(value))
-  @IsNumber()
-  @Min(0)
-  amount!: number;
+export class CreateSaleDto {
+  @ApiProperty({ type: [InvoiceLineDto] })
+  @ValidateNested({ each: true })
+  @Type(() => InvoiceLineDto)
+  @IsArray()
+  invoices!: InvoiceLineDto[];
+
+  @ApiPropertyOptional({
+    example: 'Cash',
+    enum: ['Cash', 'Card', 'Split'],
+    description: 'Payment method',
+  })
+  @Transform(({ value }) => normType(value))
+  @IsString()
+  @IsIn(['Cash', 'Card', 'Split'])
+  type: 'Cash' | 'Card' | 'Split' = 'Cash';
 
   @ApiPropertyOptional({ name: 'cash_amount', example: 500.0 })
   @Transform(({ value }) =>
@@ -44,7 +64,7 @@ export class CreatePaymentDto {
   @Min(0)
   cash_amount?: number;
 
-  @ApiPropertyOptional({ name: 'card_amount', example: 1000.0 })
+  @ApiPropertyOptional({ name: 'card_amount', example: 500.0 })
   @Transform(({ value }) =>
     value == null ? undefined : Number(value),
   )
@@ -53,35 +73,13 @@ export class CreatePaymentDto {
   @Min(0)
   card_amount?: number;
 
-  @ApiProperty({ name: 'remain_amount', example: 500.0 })
-  @Transform(({ value, obj }) => Number(value ?? obj?.remainAmount))
-  @IsNumber()
-  @Min(0)
-  remain_amount!: number;
-
-  @ApiProperty({ example: 1730563200000, description: 'epoch ms or ISO string' })
-  @Transform(({ value }) => toEpochMs(value))
-  @IsNumber()
-  date!: number;
-
-  @ApiProperty({ name: 'file_name', example: 'receipt1.pdf' })
-  @Transform(({ value, obj }) => value ?? obj?.fileName ?? null)
-  @IsString()
-  file_name!: string;
-
-  @ApiProperty({ example: 'Cash', description: 'Cash | Card | Split' })
-  @Transform(({ value }) => normType(value))
-  @IsString()
-  @IsIn(['Cash', 'Card', 'Split'])
-  type!: 'Cash' | 'Card' | 'Split';
-
   @ApiPropertyOptional({
     name: 'sale_invoice_id',
     example: 'INV-001',
-    description: 'Leave empty to auto-generate (e.g., INV-001, INV-002, ...)',
+    description: 'Optional; auto-generated when empty',
   })
   @Transform(({ value, obj }) => {
-    const v = value ?? obj?.salesInvoiceId;
+    const v = value ?? obj?.saleInvoiceId;
     return v == null ? undefined : v.toString();
   })
   @IsOptional()
@@ -94,21 +92,57 @@ export class CreatePaymentDto {
   @IsInt()
   user_id?: number | null;
 
-  @ApiPropertyOptional({ name: 'customer_contact', example: '0771234567', nullable: true })
+  @ApiPropertyOptional({
+    name: 'customer_contact',
+    example: '0771234567',
+    nullable: true,
+  })
   @Transform(({ value, obj }) => value ?? obj?.customerContact ?? null)
   @IsOptional()
   @IsString()
   customer_contact?: string | null;
 
-  @ApiProperty({ name: 'discount_type', example: 'no', description: 'no | percentage | amount' })
+  @ApiPropertyOptional({
+    name: 'file_name',
+    example: 'sale-123',
+    description: 'Optional receipt/file label',
+  })
+  @Transform(({ value, obj }) => value ?? obj?.fileName ?? undefined)
+  @IsOptional()
+  @IsString()
+  file_name?: string;
+
+  @ApiPropertyOptional({
+    name: 'discount_type',
+    example: 'no',
+    enum: ['no', 'percentage', 'amount'],
+  })
   @Transform(({ value }) => normDiscount(value))
   @IsString()
   @IsIn(['no', 'percentage', 'amount'])
-  discount_type!: 'no' | 'percentage' | 'amount';
+  discount_type: 'no' | 'percentage' | 'amount' = 'no';
 
-  @ApiProperty({ name: 'discount_value', example: 0.0 })
+  @ApiPropertyOptional({ name: 'discount_value', example: 0 })
   @Transform(({ value }) => (value == null ? 0 : Number(value)))
   @IsNumber()
   @Min(0)
-  discount_value!: number;
+  discount_value: number = 0;
+
+  @ApiPropertyOptional({
+    name: 'remain_amount',
+    example: 0,
+    description: 'Outstanding amount; capped to total',
+  })
+  @Transform(({ value }) => (value == null ? 0 : Number(value)))
+  @IsNumber()
+  @Min(0)
+  remain_amount: number = 0;
+
+  @ApiPropertyOptional({
+    example: 1730563200000,
+    description: 'epoch ms or ISO string; defaults to now',
+  })
+  @Transform(({ value }) => toEpochMs(value))
+  @IsNumber()
+  date?: number;
 }
