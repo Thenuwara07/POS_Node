@@ -187,6 +187,21 @@ export class CashierService {
       saleInvoiceId = await this.generateNextSaleInvoiceId();
     }
 
+    // Ensure customer exists if a phone is provided (avoids FK errors on payment.customer_contact)
+    let customerContact: string | null = dto.customer_contact ?? null;
+    if (customerContact) {
+      customerContact = customerContact.toString().trim();
+      if (customerContact.length > 0) {
+        await this.prisma.customer.upsert({
+          where: { contact: customerContact },
+          update: {},
+          create: { contact: customerContact, name: customerContact },
+        });
+      } else {
+        customerContact = null;
+      }
+    }
+
     try {
       const created = await this.prisma.payment.create({
         data: {
@@ -197,7 +212,7 @@ export class CashierService {
           type: typeEnum,
           saleInvoiceId,
           userId: dto.user_id ?? null,
-          customerContact: dto.customer_contact ?? null,
+          customerContact,
           discountType: discountEnum,
           discountValue: dto.discount_value ?? 0,
         },
