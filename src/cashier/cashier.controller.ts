@@ -37,6 +37,9 @@ import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
+import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
+import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
+import { QueryQuickSalesDto } from './dto/query-quick-sales.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
@@ -102,6 +105,16 @@ export class CashierController {
     return this.cashierService.insertPayment(dto);
   }
 
+  @Get('invoices')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get all invoices (payments with a sale_invoice_id)' })
+  @ApiOkResponse({ description: 'Invoices fetched.', type: PaymentRecordDto, isArray: true })
+  async getAllInvoices(): Promise<PaymentRecordDto[]> {
+    return this.cashierService.getAllInvoices();
+  }
+
   @Post('invoices')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CASHIER', 'MANAGER')
@@ -120,6 +133,47 @@ export class CashierController {
   @ApiBadRequestResponse({ description: 'Validation/Relation error.' })
   async insertInvoices(@Body() dto: CreateInvoicesDto) {
     return this.cashierService.insertInvoices(dto);
+  }
+
+  @Post('quick-sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Create a quick sale (no stock deduction). Auto-creates payment and quick-sale invoice lines.',
+  })
+  @ApiBody({ type: CreateQuickSaleDto })
+  @ApiCreatedResponse({
+    description: 'Quick sale created with payment + quick-sale invoice rows.',
+    schema: {
+      type: 'object',
+      properties: {
+        sale_invoice_id: { type: 'string', example: 'INV-QUICK-001' },
+        total: { type: 'number', example: 1500.0 },
+        payment: { type: 'object', additionalProperties: true },
+        quick_sales: {
+          type: 'array',
+          items: { type: 'object', additionalProperties: true },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  async createQuickSale(@Body() dto: CreateQuickSaleDto) {
+    return this.cashierService.createQuickSale(dto);
+  }
+
+  @Get('quick-sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'List quick sales (optional filter by userId, with payment details).',
+  })
+  @ApiOkResponse({ type: QuickSaleRecordDto, isArray: true })
+  async listQuickSales(@Query() q: QueryQuickSalesDto) {
+    return this.cashierService.getQuickSales(q);
   }
 
   @Get('returns')

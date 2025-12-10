@@ -11,6 +11,9 @@ import { ItemDto } from './dto/item.dto';
 import { BatchDto } from './dto/batch.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
+import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
+import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
+import { QueryQuickSalesDto } from './dto/query-quick-sales.dto';
 import {
   PaymentDiscountType,
   PaymentMethod,
@@ -35,6 +38,47 @@ import { InsertDrawerDto } from './dto/insert-drawer.dto';
 @Injectable()
 export class CashierService {
   constructor(private readonly prisma: PrismaService) {}
+
+  private mapPaymentRecord(p: {
+    id: number;
+    amount: number;
+    remainAmount: number;
+    date: bigint | number;
+    fileName: string | null;
+    type: PaymentMethod;
+    saleInvoiceId: string | null;
+    userId: number | null;
+    customerContact: string | null;
+    discountType: PaymentDiscountType;
+    discountValue: number;
+  }): PaymentRecordDto {
+    const dateNum =
+      typeof p.date === 'bigint'
+        ? Number(p.date)
+        : (p.date as unknown as number);
+
+    const typeStr = p.type === 'CASH' ? 'Cash' : 'Card';
+    const discountStr =
+      p.discountType === 'NO'
+        ? 'no'
+        : p.discountType === 'PERCENTAGE'
+        ? 'percentage'
+        : 'amount';
+
+    return {
+      id: p.id,
+      amount: p.amount,
+      remain_amount: p.remainAmount,
+      date: dateNum,
+      file_name: p.fileName ?? '',
+      type: typeStr,
+      sale_invoice_id: p.saleInvoiceId ?? null,
+      user_id: p.userId ?? null,
+      customer_contact: p.customerContact ?? null,
+      discount_type: discountStr,
+      discount_value: p.discountValue,
+    };
+  }
 
   private async generateNextSaleInvoiceId(
     prisma: PrismaService | Prisma.TransactionClient = this.prisma,
@@ -143,34 +187,29 @@ export class CashierService {
       },
     });
 
-    return rows.map((p) => {
-      const dateNum =
-        typeof p.date === 'bigint'
-          ? Number(p.date)
-          : (p.date as unknown as number);
+    return rows.map((p) => this.mapPaymentRecord(p));
+  }
 
-      const typeStr = p.type === 'CASH' ? 'Cash' : 'Card';
-      const discountStr =
-        p.discountType === 'NO'
-          ? 'no'
-          : p.discountType === 'PERCENTAGE'
-          ? 'percentage'
-          : 'amount';
-
-      return {
-        id: p.id,
-        amount: p.amount,
-        remain_amount: p.remainAmount,
-        date: dateNum,
-        file_name: p.fileName,
-        type: typeStr,
-        sale_invoice_id: p.saleInvoiceId ?? null,
-        user_id: p.userId ?? null,
-        customer_contact: p.customerContact ?? null,
-        discount_type: discountStr,
-        discount_value: p.discountValue,
-      };
+  async getAllInvoices(): Promise<PaymentRecordDto[]> {
+    const rows = await this.prisma.payment.findMany({
+      where: { saleInvoiceId: { not: null } },
+      orderBy: { date: 'desc' },
+      select: {
+        id: true,
+        amount: true,
+        remainAmount: true,
+        date: true,
+        fileName: true,
+        type: true,
+        saleInvoiceId: true,
+        userId: true,
+        customerContact: true,
+        discountType: true,
+        discountValue: true,
+      },
     });
+
+    return rows.map((p) => this.mapPaymentRecord(p));
   }
 
   async insertPayment(dto: CreatePaymentDto): Promise<PaymentRecordDto> {
@@ -218,24 +257,7 @@ export class CashierService {
         },
       });
 
-      return {
-        id: created.id,
-        amount: created.amount,
-        remain_amount: created.remainAmount,
-        date: Number(created.date),
-        file_name: created.fileName,
-        type: created.type === 'CARD' ? 'Card' : 'Cash',
-        sale_invoice_id: created.saleInvoiceId ?? null,
-        user_id: created.userId ?? null,
-        customer_contact: created.customerContact ?? null,
-        discount_type:
-          created.discountType === 'PERCENTAGE'
-            ? 'percentage'
-            : created.discountType === 'AMOUNT'
-            ? 'amount'
-            : 'no',
-        discount_value: created.discountValue,
-      };
+      return this.mapPaymentRecord(created);
     } catch (err: any) {
       if (err?.code === 'P2002') {
         throw new ConflictException('Duplicate value for unique field');
@@ -363,6 +385,229 @@ export class CashierService {
     }
   }
 
+  async createQuickSale(
+    dto: CreateQuickSaleDto,
+  ): Promise<{
+    sale_invoice_id: string;
+    total: number;
+    payment: PaymentRecordDto;
+    quick_sales: QuickSaleRecordDto[];
+  }> {
+    const items = Array.isArray(dto?.items) ? dto.items : [];
+    if (items.length === 0) {
+      throw new BadRequestException('At least one quick sale item is required');
+    }
+
+    const normalized = items.map((raw, idx) => {
+      const name = String(raw?.name ?? '').trim();
+      const qty =
+        typeof raw?.quantity === 'number'
+          ? Math.trunc(raw.quantity)
+          : Number.parseInt(String(raw?.quantity ?? '0'), 10) || 0;
+      const unitCost = Number(
+        (raw as any)?.unit_cost ?? (raw as any)?.unitCost ?? 0,
+      );
+      const unitPrice = Number(
+        (raw as any)?.unit_price ??
+          (raw as any)?.unitPrice ??
+          (raw as any)?.price ??
+          0,
+      );
+
+      if (!name) {
+        throw new BadRequestException(
+          `items[${idx}].name is required and must be non-empty`,
+        );
+      }
+      if (!Number.isInteger(qty) || qty <= 0) {
+        throw new BadRequestException(
+          `items[${idx}].quantity must be an integer >= 1`,
+        );
+      }
+      if (!Number.isFinite(unitCost) || unitCost < 0) {
+        throw new BadRequestException(
+          `items[${idx}].unit_cost must be >= 0`,
+        );
+      }
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        throw new BadRequestException(
+          `items[${idx}].unit_price must be >= 0`,
+        );
+      }
+
+      return {
+        name,
+        quantity: qty,
+        unitCost,
+        unitPrice,
+      };
+    });
+
+    const subtotal = normalized.reduce(
+      (sum, i) => sum + i.unitPrice * i.quantity,
+      0,
+    );
+
+    const discountType: PaymentDiscountType =
+      dto.discount_type === 'percentage'
+        ? 'PERCENTAGE'
+        : dto.discount_type === 'amount'
+        ? 'AMOUNT'
+        : 'NO';
+    const discountValueNum = Number(dto.discount_value ?? 0);
+
+    let total = subtotal;
+    if (discountType === 'PERCENTAGE') {
+      total = subtotal - subtotal * (discountValueNum / 100);
+    } else if (discountType === 'AMOUNT') {
+      total = subtotal - discountValueNum;
+    }
+    if (!Number.isFinite(total) || total < 0) {
+      total = 0;
+    }
+
+    let remainAmount = Number(dto.remain_amount ?? 0);
+    if (!Number.isFinite(remainAmount) || remainAmount < 0) {
+      remainAmount = 0;
+    }
+    if (remainAmount > total) {
+      remainAmount = total;
+    }
+
+    const paymentType: PaymentMethod =
+      dto.payment_type === 'Card' ? 'CARD' : 'CASH';
+
+    let whenMs = Number(dto.date ?? Date.now());
+    if (!Number.isFinite(whenMs)) {
+      whenMs = Date.now();
+    }
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      let saleInvoiceId = String(dto.sale_invoice_id ?? '').trim();
+      if (!saleInvoiceId) {
+        saleInvoiceId = await this.generateNextSaleInvoiceId(tx);
+      }
+
+      // Ensure customer row exists if contact provided
+      let customerContact: string | null = dto.customer_contact ?? null;
+      if (customerContact) {
+        customerContact = customerContact.toString().trim();
+        if (customerContact.length > 0) {
+          await tx.customer.upsert({
+            where: { contact: customerContact },
+            update: {},
+            create: { contact: customerContact, name: customerContact },
+          });
+        } else {
+          customerContact = null;
+        }
+      }
+
+      const payment = await tx.payment.create({
+        data: {
+          amount: total,
+          remainAmount,
+          date: BigInt(whenMs),
+          fileName:
+            dto.file_name?.toString().trim() ||
+            `quick-sale-${saleInvoiceId}`.slice(0, 200),
+          type: paymentType,
+          saleInvoiceId,
+          userId: dto.user_id ?? null,
+          customerContact,
+          discountType,
+          discountValue: discountValueNum,
+        },
+      });
+
+      const quickSales: QuickSaleRecordDto[] = [];
+      for (const item of normalized) {
+        const created = await tx.quickSale.create({
+          data: {
+            saleInvoiceId,
+            userId: dto.user_id ?? null,
+            name: item.name,
+            quantity: item.quantity,
+            unitCost: item.unitCost,
+            unitPrice: item.unitPrice,
+            createdAt: BigInt(whenMs),
+          },
+        });
+
+        quickSales.push({
+          id: created.id,
+          sale_invoice_id: created.saleInvoiceId,
+          name: created.name,
+          quantity: created.quantity,
+          unit_cost: created.unitCost,
+          unit_price: created.unitPrice,
+          total: created.unitPrice * created.quantity,
+          user_id: created.userId ?? null,
+          created_at:
+            typeof created.createdAt === 'bigint'
+              ? Number(created.createdAt)
+              : (created.createdAt as unknown as number),
+        });
+      }
+
+      const paymentDto = this.mapPaymentRecord(payment);
+      quickSales.forEach((qs) => {
+        qs.payment = paymentDto;
+      });
+
+      return {
+        sale_invoice_id: saleInvoiceId,
+        total,
+        payment: paymentDto,
+        quick_sales: quickSales,
+      };
+    });
+
+    return result;
+  }
+
+  async getQuickSales(
+    q: QueryQuickSalesDto,
+  ): Promise<QuickSaleRecordDto[]> {
+    const where: Prisma.QuickSaleWhereInput = {};
+    if (q.userId) {
+      const uid = Number(q.userId);
+      if (!Number.isInteger(uid) || uid <= 0) {
+        throw new BadRequestException('userId must be a positive integer');
+      }
+      where.userId = uid;
+    }
+
+    const rows = await this.prisma.quickSale.findMany({
+      where,
+      include: { payment: true },
+      orderBy: { createdAt: 'desc' },
+      take: q.limit,
+      skip: q.offset,
+    });
+
+    return rows.map((r) => {
+      const createdAt =
+        typeof r.createdAt === 'bigint'
+          ? Number(r.createdAt)
+          : Number(r.createdAt ?? 0);
+      const paymentDto = r.payment ? this.mapPaymentRecord(r.payment) : null;
+
+      return {
+        id: r.id,
+        sale_invoice_id: r.saleInvoiceId,
+        name: r.name,
+        quantity: r.quantity,
+        unit_cost: r.unitCost,
+        unit_price: r.unitPrice,
+        total: r.unitPrice * r.quantity,
+        user_id: r.userId ?? null,
+        created_at: createdAt,
+        payment: paymentDto,
+      };
+    });
+  }
+
   async getAllReturns(): Promise<Record<string, any>[]> {
     try {
       const rows =
@@ -458,11 +703,39 @@ export class CashierService {
         sell_price: Number(r.sell_price ?? 0),
         discount_amount: Number(r.discount_amount ?? 0),
         final_unit_price: Number(r.final_unit_price ?? 0),
-        line_total: Number(r.line_total ?? 0),
+          line_total: Number(r.line_total ?? 0),
       };
     });
 
-    return [header, ...lineMaps];
+    const quickRows = await this.prisma.quickSale.findMany({
+      where: { saleInvoiceId },
+      orderBy: { id: 'asc' },
+    });
+
+    const quickMaps = quickRows.map((r) => {
+      const qtyNum = Number(r.quantity ?? 0);
+      const qty = Number.isFinite(qtyNum) ? Math.trunc(qtyNum) : 0;
+      const unitPrice = Number(r.unitPrice ?? 0);
+      const unitCost = Number(r.unitCost ?? 0);
+
+      return {
+        invoice_id: -r.id,
+        batch_id: `QUICK-${r.id}`,
+        item_id: 0,
+        quantity: qty,
+        saled_unit_price: unitPrice,
+        item_name: r.name,
+        item_barcode: null,
+        unit_price: unitCost,
+        sell_price: unitPrice,
+        discount_amount: 0,
+        final_unit_price: unitPrice,
+        line_total: unitPrice * qty,
+        quick_sale: true,
+      };
+    });
+
+    return [header, ...lineMaps, ...quickMaps];
   }
 
   async getReturnsRich(): Promise<ReturnRichDto[]> {
