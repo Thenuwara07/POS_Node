@@ -1494,6 +1494,41 @@ export class CashierService {
           `);
 
           if (!rows.length) {
+            // Fallback: allow batch-only match in case the frontend sent a wrong item_id
+            const fallback = await tx.stock.findFirst({
+              where: { batchId },
+              select: { id: true, itemId: true, quantity: true },
+            });
+
+            if (fallback) {
+              const affectedFallback = await tx.$executeRaw(
+                Prisma.sql`
+                  UPDATE "stock"
+                  SET quantity = quantity - ${qtyReq}
+                  WHERE id = ${fallback.id} AND quantity >= ${qtyReq}
+                `,
+              );
+
+              if (affectedFallback === 1) {
+                updated.push({
+                  batch_id: batchId,
+                  item_id: fallback.itemId,
+                  deducted: qtyReq,
+                  note: 'fallback: batch matched, item_id corrected',
+                });
+                continue;
+              }
+
+              warnings.push({
+                batch_id: batchId,
+                item_id: fallback.itemId,
+                requested: qtyReq,
+                available: Number(fallback.quantity ?? 0),
+                reason: 'insufficient_stock',
+              });
+              continue;
+            }
+
             missing.push({
               batch_id: batchId,
               item_id: itemId,
