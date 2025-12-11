@@ -7,19 +7,40 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class UpdateStockFromInvoicesLineDto {
   @ApiProperty({ example: 'BATCH-AMBUN-001' })
+  @Transform(({ value, obj }) =>
+    String(value ?? obj?.batchId ?? obj?.batch_id ?? '').trim(),
+  )
   @IsString()
   batch_id: string;
 
   @ApiProperty({ example: 3, description: 'item_id; 0 = quick sale / service' })
+  @Transform(({ value, obj }) => {
+    const candidate =
+      value ?? obj?.itemId ?? obj?.item_id ?? obj?.item ?? obj?.id ?? 0;
+    const n =
+      typeof candidate === 'number'
+        ? candidate
+        : Number.parseInt(String(candidate ?? '0'), 10);
+    return Number.isFinite(n) ? Math.trunc(n) : 0;
+  })
   @IsInt()
   @Min(0)
   item_id: number;
 
   @ApiProperty({ example: 2, description: 'Quantity to deduct from stock' })
+  @Transform(({ value, obj }) => {
+    const candidate =
+      value ?? obj?.quantity ?? obj?.qty ?? obj?.amount ?? 0;
+    const n =
+      typeof candidate === 'number'
+        ? candidate
+        : Number.parseInt(String(candidate ?? '0'), 10);
+    return Number.isFinite(n) ? Math.trunc(n) : 0;
+  })
   @IsInt()
   @Min(1)
   quantity: number;
