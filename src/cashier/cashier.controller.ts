@@ -40,6 +40,7 @@ import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
 import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
+import { BillHistoryDto } from './dto/bill-history.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
@@ -50,6 +51,7 @@ import {
 } from './dto/stock-apply.dto';
 import { QueryDrawersDto } from './dto/query-drawers.dto';
 import { InsertDrawerDto } from './dto/insert-drawer.dto';
+// import { QueryBillHistoryDto } from './dto/query-bill-history.dto';
 
 @ApiTags('Cashier')
 @Controller('cashier')
@@ -256,6 +258,23 @@ export class CashierController {
   @ApiOkResponse({ type: QuickSaleRecordDto, isArray: true })
   async listQuickSales() {
     return this.cashierService.getQuickSales();
+  }
+
+  @Get('bill-history/:userId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Bill history for a user: today summary + latest drawer exchange + recent bills (by sale_invoice_id).',
+  })
+  @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiOkResponse({ type: BillHistoryDto })
+  async getBillHistory(
+    @Param('userId', ParseIntPipe) userId: number,
+   
+  ) {
+    return this.cashierService.getBillHistory(userId);
   }
 
   @Get('returns')

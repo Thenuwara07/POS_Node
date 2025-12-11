@@ -34,6 +34,12 @@ import {
 } from './dto/stock-apply.dto';
 import { QueryDrawersDto } from './dto/query-drawers.dto';
 import { InsertDrawerDto } from './dto/insert-drawer.dto';
+// import { QueryBillHistoryDto } from './dto/query-bill-history.dto';
+import {
+  BillHistoryDto,
+  BillHistoryLatestExchangeDto,
+  BillHistorySummaryDto,
+} from './dto/bill-history.dto';
 
 @Injectable()
 export class CashierService {
@@ -832,6 +838,111 @@ export class CashierService {
         payment: paymentDto,
       };
     });
+  }
+
+  async getBillHistory(
+    userId: number
+  ): Promise<BillHistoryDto> {
+    const uid = Number(userId);
+    if (!Number.isInteger(uid) || uid <= 0) {
+      throw new BadRequestException('userId must be a positive integer');
+    }
+
+    
+
+    const where: Prisma.PaymentWhereInput = {
+      userId: uid,
+      saleInvoiceId: { not: null },
+    };
+
+   
+
+    const payments = await this.prisma.payment.findMany({
+      
+    });
+
+    const bills = payments.map((p) => this.mapPaymentRecord(p));
+
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startMs = start.getTime();
+    const endMs = startMs + 24 * 60 * 60 * 1000;
+
+    const salesRows = await this.prisma.$queryRaw<
+      Array<{ total: number | null }>
+    >(Prisma.sql`
+      SELECT COALESCE(SUM(amount), 0) AS total
+      FROM "payment"
+      WHERE user_id = ${uid}
+        AND sale_invoice_id IS NOT NULL
+        AND date >= ${Prisma.sql`${startMs}::bigint`}
+        AND date <  ${Prisma.sql`${endMs}::bigint`}
+    `);
+    const todaySales = Number(salesRows?.[0]?.total ?? 0);
+
+    const tableExistsRows = await this.prisma.$queryRaw<
+      Array<{ exists: boolean | null }>
+    >(Prisma.sql`SELECT to_regclass('public.drawer') IS NOT NULL AS exists`);
+    const drawerTableExists = !!tableExistsRows?.[0]?.exists;
+
+    let todayIn = 0;
+    let todayOut = 0;
+    let latestExchange: BillHistoryLatestExchangeDto | null = null;
+
+    if (drawerTableExists) {
+      const drawerSums = await this.prisma.$queryRaw<
+        Array<{ in_total: number | null; out_total: number | null }>
+      >(Prisma.sql`
+        SELECT
+          COALESCE(SUM(CASE WHEN upper(type) = 'IN' THEN amount ELSE 0 END), 0) AS in_total,
+          COALESCE(SUM(CASE WHEN upper(type) = 'OUT' THEN amount ELSE 0 END), 0) AS out_total
+        FROM "drawer"
+        WHERE user_id = ${uid}
+          AND date >= ${Prisma.sql`${startMs}::bigint`}
+          AND date <  ${Prisma.sql`${endMs}::bigint`}
+      `);
+
+      todayIn = Number(drawerSums?.[0]?.in_total ?? 0);
+      todayOut = Number(drawerSums?.[0]?.out_total ?? 0);
+
+      const latestDrawerRows = await this.prisma.$queryRaw<
+        Array<{ id: number; amount: number; type: string; reason: string; date: bigint | number }>
+      >(Prisma.sql`
+        SELECT id, amount, type, reason, date
+        FROM "drawer"
+        WHERE user_id = ${uid}
+        ORDER BY date DESC
+        LIMIT 1
+      `);
+
+      if (latestDrawerRows?.length) {
+        const row = latestDrawerRows[0];
+        const dt =
+          typeof row.date === 'bigint'
+            ? Number(row.date)
+            : (row.date as unknown as number);
+        latestExchange = {
+          id: Number(row.id),
+          amount: Number(row.amount ?? 0),
+          type: String(row.type ?? ''),
+          reason: String(row.reason ?? ''),
+          date: dt,
+        };
+      }
+    }
+
+    const summary: BillHistorySummaryDto = {
+      today_sales: todaySales,
+      today_in: todayIn,
+      today_out: todayOut,
+      today_net: todaySales + todayIn - todayOut,
+    };
+
+    return {
+      summary,
+      latest_exchange: latestExchange,
+      bills,
+    };
   }
 
   async getAllReturns(): Promise<Record<string, any>[]> {
