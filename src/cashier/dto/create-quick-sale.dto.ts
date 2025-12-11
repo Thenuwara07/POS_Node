@@ -123,10 +123,30 @@ export class CreateQuickSaleDto {
   remain_amount: number = 0;
 
   @ApiPropertyOptional({
+    example: 1500,
+    description: 'Reported total from the client (ignored).',
+  })
+  @Transform(({ value }) => (value == null ? undefined : Number(value)))
+  @IsOptional()
+  @IsNumber()
+  total?: number;
+
+  @ApiPropertyOptional({
     example: 1730563200000,
     description: 'epoch ms or ISO string; defaults to now',
   })
-  @Transform(({ value }) => toEpochMs(value))
+  @Transform(({ value, obj }) => toEpochMs(value ?? obj?.created_at))
+  @IsOptional()
   @IsNumber()
   date?: number;
+
+  @ApiPropertyOptional({
+    name: 'created_at',
+    example: 1730563200000,
+    description: 'Legacy alias for the sale date.',
+  })
+  @Transform(({ value }) => toEpochMs(value))
+  @IsOptional()
+  @IsNumber()
+  created_at?: number;
 }
