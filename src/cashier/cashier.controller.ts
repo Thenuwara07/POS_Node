@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -17,6 +18,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CashierService } from './cashier.service';
 
 import {
@@ -278,6 +280,20 @@ export class CashierController {
     return this.cashierService.getBillHistory(userId);
   }
 
+  @Get('bill-history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Bill history for the authenticated user: today summary + latest drawer exchange + recent bills.',
+  })
+  @ApiOkResponse({ type: BillHistoryDto })
+  async getBillHistoryForCurrentUser(@CurrentUser() user: any) {
+    const userId = this.resolveUserId(user);
+    return this.cashierService.getBillHistory(userId);
+  }
+
   @Get('returns')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CASHIER', 'MANAGER')
@@ -488,12 +504,15 @@ export class CashierController {
   })
   @ApiBadRequestResponse({ description: 'Validation error' })
   async updateStockFromInvoicesPayload(
-    @Body() payload: UpdateStockFromInvoicesPayloadDto,
+    @Body() payload: Record<string, any>,
     @Query('allOrNothing', new ParseBoolPipe({ optional: true }))
     allOrNothing = false,
   ): Promise<StockApplyResultDto> {
+    const normalized: UpdateStockFromInvoicesPayloadDto = {
+      invoices: Array.isArray(payload?.invoices) ? payload.invoices : [],
+    };
     return this.cashierService.updateStockFromInvoicesPayload(
-      payload,
+      normalized,
       allOrNothing,
     );
   }
@@ -555,5 +574,16 @@ export class CashierController {
   })
   async getDrawerById(@Param('id', ParseIntPipe) id: number) {
     return this.cashierService.getDrawerById(id);
+  }
+
+  private resolveUserId(user: any): number {
+    const candidate = user?.userId ?? user?.sub ?? user?.id;
+    const numericId = Number(candidate ?? NaN);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      throw new BadRequestException(
+        'Authenticated user id is missing or invalid.',
+      );
+    }
+    return numericId;
   }
 }
