@@ -40,7 +40,6 @@ import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
 import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
-import { QueryQuickSalesDto } from './dto/query-quick-sales.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
@@ -252,11 +251,11 @@ export class CashierController {
   @Roles('CASHIER', 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
-    summary: 'List quick sales (optional filter by userId, with payment details).',
+    summary: 'List quick sales with payment details.',
   })
   @ApiOkResponse({ type: QuickSaleRecordDto, isArray: true })
-  async listQuickSales(@Query() q: QueryQuickSalesDto) {
-    return this.cashierService.getQuickSales(q);
+  async listQuickSales() {
+    return this.cashierService.getQuickSales();
   }
 
   @Get('returns')

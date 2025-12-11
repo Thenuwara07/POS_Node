@@ -13,7 +13,6 @@ import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
 import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
-import { QueryQuickSalesDto } from './dto/query-quick-sales.dto';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import {
   PaymentDiscountType,
@@ -807,24 +806,10 @@ export class CashierService {
     return result;
   }
 
-  async getQuickSales(
-    q: QueryQuickSalesDto,
-  ): Promise<QuickSaleRecordDto[]> {
-    const where: Prisma.QuickSaleWhereInput = {};
-    if (q.userId) {
-      const uid = Number(q.userId);
-      if (!Number.isInteger(uid) || uid <= 0) {
-        throw new BadRequestException('userId must be a positive integer');
-      }
-      where.userId = uid;
-    }
-
+  async getQuickSales(): Promise<QuickSaleRecordDto[]> {
     const rows = await this.prisma.quickSale.findMany({
-      where,
       include: { payment: true },
       orderBy: { createdAt: 'desc' },
-      take: q.limit,
-      skip: q.offset,
     });
 
     return rows.map((r) => {
