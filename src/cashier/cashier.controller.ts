@@ -451,6 +451,17 @@ export class CashierController {
       'List drawers by user with pagination. orderBy: date_desc_id_desc (default) | date_asc_id_asc',
   })
   @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false, enum: ['IN', 'OUT'] })
+  @ApiQuery({ name: 'dateFromMillis', required: false, type: Number })
+  @ApiQuery({ name: 'dateToMillis', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({
+    name: 'orderBy',
+    required: false,
+    enum: ['date_desc_id_desc', 'date_asc_id_asc'],
+  })
   @ApiOkResponse({
     description: 'Drawer rows',
     schema: { type: 'array', items: { type: 'object', additionalProperties: true } },
@@ -459,12 +470,52 @@ export class CashierController {
     @Param('userId', ParseIntPipe) userId: number,
     @Query() q: DrawersQueryDto,
   ) {
-    return this.cashierService.getDrawersByUserIdPaged(
-      userId,
-      q.limit,
-      q.offset,
-      q.orderBy ?? 'date_desc_id_desc',
-    );
+    return this.cashierService.getDrawersByUserIdPaged(userId, q);
+  }
+
+  @Get('drawers/user/:userId/history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Drawer history for a user with totals (filterable by type/date/search; paginated).',
+  })
+  @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'offset', required: false, type: Number })
+  @ApiQuery({ name: 'type', required: false, enum: ['IN', 'OUT'] })
+  @ApiQuery({ name: 'dateFromMillis', required: false, type: Number })
+  @ApiQuery({ name: 'dateToMillis', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({
+    name: 'orderBy',
+    required: false,
+    enum: ['date_desc_id_desc', 'date_asc_id_asc'],
+  })
+  @ApiOkResponse({
+    description: 'Drawer summary and rows',
+    schema: {
+      type: 'object',
+      properties: {
+        summary: {
+          type: 'object',
+          properties: {
+            total_in: { type: 'number', example: 100 },
+            total_out: { type: 'number', example: 40 },
+            net: { type: 'number', example: 60 },
+            count: { type: 'number', example: 12 },
+          },
+        },
+        rows: { type: 'array', items: { type: 'object', additionalProperties: true } },
+      },
+    },
+  })
+  async getDrawerHistory(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Query() q: QueryDrawersDto,
+  ) {
+    return this.cashierService.getDrawerHistory(userId, q);
   }
 
   @Post('stock/apply-from-invoices')
@@ -524,23 +575,12 @@ export class CashierController {
     summary:
       'List drawers with optional filters (userId, type, dateFromMillis, dateToMillis) and pagination',
   })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'offset', required: false, type: Number })
-  @ApiQuery({ name: 'userId', required: false, type: Number })
-  @ApiQuery({ name: 'type', required: false, type: String })
-  @ApiQuery({ name: 'dateFromMillis', required: false, type: Number })
-  @ApiQuery({ name: 'dateToMillis', required: false, type: Number })
-  @ApiQuery({
-    name: 'orderBy',
-    required: false,
-    enum: ['date_desc_id_desc', 'date_asc_id_asc'],
-  })
   @ApiOkResponse({
     description: 'Drawer rows',
     schema: { type: 'array', items: { type: 'object', additionalProperties: true } },
   })
-  async getAllDrawers(@Query() q: QueryDrawersDto) {
-    return this.cashierService.getAllDrawers(q);
+  async getAllDrawers() {
+    return this.cashierService.getAllDrawers();
   }
 
   @Get('drawers/:id')

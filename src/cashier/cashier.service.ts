@@ -24,7 +24,7 @@ import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
-import { DrawerOrderKey } from './dto/drawers-query.dto';
+import { DrawerOrderKey, DrawersQueryDto } from './dto/drawers-query.dto';
 import {
   StockApplyMissingDto,
   StockApplyResultDto,
@@ -1272,6 +1272,100 @@ export class CashierService {
     }
   }
 
+  private buildDrawerWhereClause(filters: {
+    userId?: number;
+    type?: string;
+    dateFromMillis?: number;
+    dateToMillis?: number;
+    search?: string;
+  }): Prisma.Sql {
+    const whereClauses: Prisma.Sql[] = [];
+
+    const uid =
+      filters.userId != null && Number.isFinite(Number(filters.userId))
+        ? Number(filters.userId)
+        : undefined;
+    if (uid) whereClauses.push(Prisma.sql`user_id = ${uid}`);
+
+    if (filters.type) {
+      const t = String(filters.type).toUpperCase();
+      if (t === 'IN' || t === 'OUT') {
+        whereClauses.push(Prisma.sql`upper(type) = ${t}`);
+      }
+    }
+
+    if (filters.dateFromMillis != null) {
+      const fromMs = Number(filters.dateFromMillis);
+      if (Number.isFinite(fromMs)) {
+        whereClauses.push(
+          Prisma.sql`date >= ${Prisma.sql`${fromMs}::bigint`}`,
+        );
+      }
+    }
+
+    if (filters.dateToMillis != null) {
+      const toMs = Number(filters.dateToMillis);
+      if (Number.isFinite(toMs)) {
+        whereClauses.push(
+          Prisma.sql`date <= ${Prisma.sql`${toMs}::bigint`}`,
+        );
+      }
+    }
+
+    if (filters.search) {
+      const term = String(filters.search).trim();
+      if (term.length > 0) {
+        const like = `%${term}%`;
+        whereClauses.push(
+          Prisma.sql`
+            (
+              CAST(id AS TEXT) ILIKE ${like}
+              OR CAST(amount AS TEXT) ILIKE ${like}
+              OR COALESCE(reason, '') ILIKE ${like}
+            )
+          `,
+        );
+      }
+    }
+
+    return whereClauses.length > 0
+      ? Prisma.sql`WHERE ${Prisma.join(whereClauses, ' AND ')}`
+      : Prisma.empty;
+  }
+
+  private normalizeDrawerRows(
+    rows: Array<Record<string, any>>,
+  ): Array<Record<string, any>> {
+    return rows.map((r) => {
+      const o: Record<string, any> = {};
+      for (const k of Object.keys(r)) {
+        const v = (r as any)[k];
+        o[k] = typeof v === 'bigint' ? Number(v) : v;
+      }
+      return o;
+    });
+  }
+
+  private async ensureDrawerTable(): Promise<boolean> {
+    const existsRows = await this.prisma.$queryRaw<
+      Array<{ exists: boolean | null }>
+    >(Prisma.sql`SELECT to_regclass('public.drawer') IS NOT NULL AS exists`);
+    const exists = !!existsRows?.[0]?.exists;
+    if (exists) return true;
+
+    await this.prisma.$executeRaw(Prisma.sql`
+      CREATE TABLE IF NOT EXISTS "drawer" (
+        id SERIAL PRIMARY KEY,
+        amount DOUBLE PRECISION NOT NULL,
+        date BIGINT NOT NULL,
+        reason TEXT NOT NULL,
+        type TEXT NOT NULL,
+        user_id INTEGER NOT NULL
+      )
+    `);
+    return true;
+  }
+
   async getDrawersByUserId(
     userId: number,
     todayOnly = false,
@@ -1290,6 +1384,8 @@ export class CashierService {
       startMs = start.getTime();
       endMs = end.getTime();
     }
+
+    await this.ensureDrawerTable();
 
     const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
       todayOnly
@@ -1336,6 +1432,8 @@ export class CashierService {
       endMs = end.getTime();
     }
 
+    await this.ensureDrawerTable();
+
     const row = await this.prisma.$queryRaw<Array<{ cnt: bigint }>>(
       todayOnly
         ? Prisma.sql`
@@ -1373,28 +1471,118 @@ export class CashierService {
     return out;
   }
 
+  async getDrawerHistory(
+    userId: number,
+    q: QueryDrawersDto,
+  ): Promise<{
+    summary: {
+      total_in: number;
+      total_out: number;
+      net: number;
+      count: number;
+    };
+    rows: Array<Record<string, any>>;
+  }> {
+    const uid = Number(userId);
+    if (!Number.isInteger(uid) || uid <= 0) {
+      throw new BadRequestException('userId must be a positive integer');
+    }
+
+    await this.ensureDrawerTable();
+
+    const whereSql = this.buildDrawerWhereClause({
+      userId: uid,
+      type: q.type,
+      dateFromMillis: q.dateFromMillis,
+      dateToMillis: q.dateToMillis,
+      search: q.search,
+    });
+
+    const orderSql =
+      (q.orderBy ?? 'date_desc_id_desc') === 'date_asc_id_asc'
+        ? Prisma.sql`ORDER BY date ASC, id ASC`
+        : Prisma.sql`ORDER BY date DESC, id DESC`;
+
+    const base = Prisma.sql`
+      SELECT * FROM "drawer"
+      ${whereSql}
+      ${orderSql}
+    `;
+
+    let rows: Array<Record<string, any>>;
+    if (q.limit != null && q.offset != null) {
+      rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
+        Prisma.sql`${base} LIMIT ${q.limit} OFFSET ${q.offset}`,
+      );
+    } else if (q.limit != null) {
+      rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
+        Prisma.sql`${base} LIMIT ${q.limit}`,
+      );
+    } else {
+      rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(base);
+    }
+
+    const totals =
+      await this.prisma.$queryRaw<
+        Array<{ total_in: number | null; total_out: number | null; count: bigint | number | null }>
+      >(Prisma.sql`
+        SELECT
+          COALESCE(SUM(CASE WHEN upper(type) = 'IN' THEN amount ELSE 0 END), 0) AS total_in,
+          COALESCE(SUM(CASE WHEN upper(type) = 'OUT' THEN amount ELSE 0 END), 0) AS total_out,
+          COUNT(*)::bigint AS count
+        FROM "drawer"
+        ${whereSql}
+      `);
+
+    const totalsRow = totals?.[0];
+    const totalIn = Number(totalsRow?.total_in ?? 0);
+    const totalOut = Number(totalsRow?.total_out ?? 0);
+    const count =
+      typeof totalsRow?.count === 'bigint'
+        ? Number(totalsRow.count)
+        : Number(totalsRow?.count ?? 0);
+
+    return {
+      summary: {
+        total_in: totalIn,
+        total_out: totalOut,
+        net: totalIn - totalOut,
+        count,
+      },
+      rows: this.normalizeDrawerRows(rows),
+    };
+  }
+
   async getDrawersByUserIdPaged(
     userId: number,
-    limit?: number,
-    offset?: number,
-    orderBy: DrawerOrderKey = 'date_desc_id_desc',
+    q: DrawersQueryDto,
   ): Promise<Record<string, any>[]> {
     const uid = Number(userId);
     if (!Number.isInteger(uid) || uid <= 0) {
       throw new BadRequestException('userId must be a positive integer');
     }
 
+    await this.ensureDrawerTable();
+
     const orderSql =
-      orderBy === 'date_asc_id_asc'
+      (q.orderBy ?? 'date_desc_id_desc') === 'date_asc_id_asc'
         ? Prisma.sql`ORDER BY date ASC, id ASC`
         : Prisma.sql`ORDER BY date DESC, id DESC`;
 
-    const lim = limit && limit > 0 ? limit : undefined;
-    const off = offset && offset >= 0 ? offset : undefined;
+    const lim = q.limit && q.limit > 0 ? q.limit : undefined;
+    const off = q.offset && q.offset >= 0 ? q.offset : undefined;
+
+    const whereSql = this.buildDrawerWhereClause({
+      userId: uid,
+      type: q.type,
+      dateFromMillis: q.dateFromMillis,
+      dateToMillis: q.dateToMillis,
+      search: q.search,
+    });
 
     const base = Prisma.sql`
       SELECT * FROM "drawer"
-      WHERE user_id = ${uid}
+      ${whereSql}
       ${orderSql}
     `;
 
@@ -1409,14 +1597,7 @@ export class CashierService {
           )
         : await this.prisma.$queryRaw<Array<Record<string, any>>>(base);
 
-    return rows.map((r) => {
-      const o: Record<string, any> = {};
-      for (const k of Object.keys(r)) {
-        const v = (r as any)[k];
-        o[k] = typeof v === 'bigint' ? Number(v) : v;
-      }
-      return o;
-    });
+    return this.normalizeDrawerRows(rows);
   }
 
   async updateStockFromInvoicesPayload(
@@ -1560,7 +1741,7 @@ export class CashierService {
   async insertDrawer(dto: InsertDrawerDto): Promise<{ id: number }> {
     const amount = Number(dto.amount);
     const reason = String(dto.reason ?? '').trim();
-    const type = String(dto.type ?? '').trim();
+    const type = String(dto.type ?? '').trim().toUpperCase();
     const userId = Number(dto.user_id);
 
     let whenMs: number;
@@ -1574,22 +1755,27 @@ export class CashierService {
       whenMs = Date.now();
     }
 
-    if (!Number.isFinite(amount)) {
-      throw new BadRequestException('amount must be a finite number');
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException('amount must be a positive number');
     }
     if (!reason) {
       throw new BadRequestException(
         'reason is required and must be non-empty',
       );
     }
-    if (!type) {
-      throw new BadRequestException('type is required and must be non-empty');
+    if (type !== 'IN' && type !== 'OUT') {
+      throw new BadRequestException('type must be IN or OUT');
     }
     if (!Number.isInteger(userId) || userId <= 0) {
       throw new BadRequestException('user_id is required and must be > 0');
     }
+    if (!Number.isFinite(whenMs)) {
+      throw new BadRequestException('date is invalid');
+    }
 
     try {
+      await this.ensureDrawerTable();
+
       const rows = await this.prisma.$queryRaw<Array<{ id: number }>>(Prisma.sql`
         INSERT INTO "drawer" ("amount","date","reason","type","user_id")
         VALUES (${amount}, ${Prisma.sql`${whenMs}::bigint`}, ${reason}, ${type}, ${userId})
@@ -1603,27 +1789,19 @@ export class CashierService {
     }
   }
 
-  async getAllDrawers(q: QueryDrawersDto): Promise<Record<string, any>[]> {
-    const whereClauses: Prisma.Sql[] = [];
+  async getAllDrawers(q: QueryDrawersDto = {} as QueryDrawersDto): Promise<Record<string, any>[]> {
+    await this.ensureDrawerTable();
 
-    if (q.userId) whereClauses.push(Prisma.sql`user_id = ${q.userId}`);
-    if (q.type) whereClauses.push(Prisma.sql`type = ${q.type}`);
-    if (q.dateFromMillis)
-      whereClauses.push(
-        Prisma.sql`date >= ${Prisma.sql`${q.dateFromMillis}::bigint`}`,
-      );
-    if (q.dateToMillis)
-      whereClauses.push(
-        Prisma.sql`date <= ${Prisma.sql`${q.dateToMillis}::bigint`}`,
-      );
-
-    const whereSql =
-      whereClauses.length > 0
-        ? Prisma.sql`WHERE ${Prisma.join(whereClauses, ' AND ')}`
-        : Prisma.empty;
+    const whereSql = this.buildDrawerWhereClause({
+      userId: q?.userId,
+      type: q?.type,
+      dateFromMillis: q?.dateFromMillis,
+      dateToMillis: q?.dateToMillis,
+      search: q?.search,
+    });
 
     const orderSql: Prisma.Sql =
-      (q.orderBy ?? 'date_desc_id_desc') === 'date_asc_id_asc'
+      (q?.orderBy ?? 'date_desc_id_desc') === 'date_asc_id_asc'
         ? Prisma.sql`ORDER BY date ASC, id ASC`
         : Prisma.sql`ORDER BY date DESC, id DESC`;
 
@@ -1634,11 +1812,11 @@ export class CashierService {
     `;
 
     let rows: Array<Record<string, any>>;
-    if (q.limit != null && q.offset != null) {
+    if (q?.limit != null && q?.offset != null) {
       rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
         Prisma.sql`${base} LIMIT ${q.limit} OFFSET ${q.offset}`,
       );
-    } else if (q.limit != null) {
+    } else if (q?.limit != null) {
       rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
         Prisma.sql`${base} LIMIT ${q.limit}`,
       );
@@ -1646,14 +1824,7 @@ export class CashierService {
       rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(base);
     }
 
-    return rows.map((r) => {
-      const o: Record<string, any> = {};
-      for (const k of Object.keys(r)) {
-        const v = (r as any)[k];
-        o[k] = typeof v === 'bigint' ? Number(v) : v;
-      }
-      return o;
-    });
+    return this.normalizeDrawerRows(rows);
   }
 
   async getDrawerById(id: number): Promise<Record<string, any> | null> {
@@ -1661,6 +1832,8 @@ export class CashierService {
     if (!Number.isInteger(rid) || rid <= 0) {
       throw new BadRequestException('id must be > 0');
     }
+
+    await this.ensureDrawerTable();
 
     const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
       Prisma.sql`

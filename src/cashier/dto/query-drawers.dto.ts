@@ -31,6 +31,15 @@ export class QueryDrawersDto {
   @IsString()
   type?: string;
 
+  @ApiProperty({
+    required: false,
+    description: 'Search by id, amount, or reason',
+  })
+  @IsOptional()
+  @Transform(({ value }) => (value == null ? undefined : String(value).trim()))
+  @IsString()
+  search?: string;
+
   @ApiProperty({ required: false })
   @IsOptional()
   @Transform(({ value }) => (value == null ? undefined : Number(value)))
