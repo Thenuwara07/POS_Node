@@ -33,6 +33,7 @@ enum SupplierRequestStatus {
 enum PaymentMethod {
   CASH
   CARD
+  SPLIT
 }
 
 enum PaymentDiscountType {
@@ -76,6 +77,7 @@ model User {
   creditorsCreated  Creditor[]    @relation("creditor_created_by")
   creditorsUpdated  Creditor[]    @relation("creditor_updated_by")
   authLogs          AuthLog[]
+  quickSales        QuickSale[]   @relation("QuickSaleUser")
 
   @@map("user")
 }
@@ -188,6 +190,8 @@ model Payment {
   date            BigInt
   fileName        String              @map("file_name")
   type            PaymentMethod       @map("type")
+  cashAmount      Float               @default(0) @map("cash_amount")
+  cardAmount      Float               @default(0) @map("card_amount")
   saleInvoiceId   String?             @unique @map("sale_invoice_id")
   userId          Int?                @map("user_id")
   customerContact String?             @map("customer_contact")
@@ -197,6 +201,7 @@ model Payment {
   invoices Invoice[]
   user     User?     @relation(fields: [userId], references: [id])
   customer Customer? @relation(fields: [customerContact], references: [contact])
+  quickSales QuickSale[] @relation("QuickSalePayment")
 
   @@index([userId])
   @@index([saleInvoiceId])
@@ -216,6 +221,24 @@ model Invoice {
 
   @@index([saleInvoiceId])
   @@map("invoice")
+}
+
+model QuickSale {
+  id            Int     @id @default(autoincrement())
+  saleInvoiceId String  @map("sale_invoice_id")
+  userId        Int?    @map("user_id")
+  name          String
+  quantity      Int
+  unitCost      Float   @map("unit_cost")
+  unitPrice     Float   @map("unit_price")
+  createdAt     BigInt  @map("created_at")
+
+  payment Payment? @relation("QuickSalePayment", fields: [saleInvoiceId], references: [saleInvoiceId])
+  user    User?    @relation("QuickSaleUser", fields: [userId], references: [id])
+
+  @@index([saleInvoiceId])
+  @@index([userId])
+  @@map("quick_sale")
 }
 
 model SupplierRequest {

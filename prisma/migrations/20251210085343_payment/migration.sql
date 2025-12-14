@@ -1,0 +1,6 @@
+-- AlterEnum
+ALTER TYPE "PaymentMethod" ADD VALUE 'SPLIT';
+
+-- AlterTable
+ALTER TABLE "payment" ADD COLUMN     "card_amount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "cash_amount" DOUBLE PRECISION NOT NULL DEFAULT 0;

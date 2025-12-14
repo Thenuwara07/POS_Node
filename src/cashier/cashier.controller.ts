@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -17,6 +18,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CashierService } from './cashier.service';
 
 import {
@@ -38,6 +40,10 @@ import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
+import { CreateSaleDto } from './dto/create-sale.dto';
+import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
+import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
+import { BillHistoryDto } from './dto/bill-history.dto';
 import { ReturnRichDto } from './dto/return-rich.dto';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { UpdateReturnDoneDto } from './dto/update-return-done.dto';
@@ -48,6 +54,7 @@ import {
 } from './dto/stock-apply.dto';
 import { QueryDrawersDto } from './dto/query-drawers.dto';
 import { InsertDrawerDto } from './dto/insert-drawer.dto';
+// import { QueryBillHistoryDto } from './dto/query-bill-history.dto';
 
 @ApiTags('Cashier')
 @Controller('cashier')
@@ -103,6 +110,70 @@ export class CashierController {
     return this.cashierService.insertPayment(dto);
   }
 
+  @Post('sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Create a sale in one call: payment (Cash/Card/Split) + invoices + optional auto stock deduction',
+  })
+  @ApiQuery({
+    name: 'applyStock',
+    required: false,
+    type: Boolean,
+    example: true,
+    description: 'Automatically deduct stock after invoices (default: true)',
+  })
+  @ApiQuery({
+    name: 'allOrNothing',
+    required: false,
+    type: Boolean,
+    example: false,
+    description: 'When true, stock deduction will rollback if any line fails',
+  })
+  @ApiBody({ type: CreateSaleDto })
+  @ApiCreatedResponse({
+    description: 'Sale created.',
+    schema: {
+      type: 'object',
+      properties: {
+        sale_invoice_id: { type: 'string', example: 'INV-001' },
+        payment: { type: 'object', additionalProperties: true },
+        invoices: {
+          type: 'object',
+          properties: { count: { type: 'number', example: 3 } },
+        },
+        stock: {
+          type: 'object',
+          properties: {
+            updated: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            warnings: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            missing: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  async createSale(
+    @Body() dto: CreateSaleDto,
+    @Query('applyStock', new ParseBoolPipe({ optional: true })) applyStock = true,
+    @Query('allOrNothing', new ParseBoolPipe({ optional: true })) allOrNothing = false,
+  ) {
+    return this.cashierService.createSale(dto, applyStock, allOrNothing);
+  }
+
+  @Get('invoices')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Get all invoices (payments with a sale_invoice_id)' })
+  @ApiOkResponse({ description: 'Invoices fetched.', type: PaymentRecordDto, isArray: true })
+  async getAllInvoices(): Promise<PaymentRecordDto[]> {
+    return this.cashierService.getAllInvoices();
+  }
+
   @Post('invoices')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CASHIER', 'MANAGER')
@@ -111,16 +182,116 @@ export class CashierController {
     summary:
       'Insert invoices for a sale_invoice_id (transactional; aborts on any error). If unit_saled_price omitted, uses stock.sell_price - discount_amount and updates payment.amount.',
   })
+  @ApiQuery({
+    name: 'applyStock',
+    required: false,
+    type: Boolean,
+    example: true,
+    description: 'Automatically deduct stock after creating invoices (default: true)',
+  })
+  @ApiQuery({
+    name: 'allOrNothing',
+    required: false,
+    type: Boolean,
+    example: false,
+    description: 'When true, stock deduction will rollback if any line is invalid',
+  })
   @ApiCreatedResponse({
     description: 'Invoices inserted.',
     schema: {
       type: 'object',
-      properties: { count: { type: 'number', example: 3 } },
+      properties: {
+        count: { type: 'number', example: 3 },
+        stock: {
+          type: 'object',
+          properties: {
+            updated: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            warnings: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            missing: { type: 'array', items: { type: 'object', additionalProperties: true } },
+          },
+        },
+      },
     },
   })
   @ApiBadRequestResponse({ description: 'Validation/Relation error.' })
-  async insertInvoices(@Body() dto: CreateInvoicesDto) {
-    return this.cashierService.insertInvoices(dto);
+  async insertInvoices(
+    @Body() dto: CreateInvoicesDto,
+    @Query('applyStock', new ParseBoolPipe({ optional: true })) applyStock = true,
+    @Query('allOrNothing', new ParseBoolPipe({ optional: true })) allOrNothing = false,
+  ) {
+    return this.cashierService.insertInvoices(dto, applyStock, allOrNothing);
+  }
+
+  @Post('quick-sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Create a quick sale (no stock deduction). Auto-creates payment and quick-sale invoice lines.',
+  })
+  @ApiBody({ type: CreateQuickSaleDto })
+  @ApiCreatedResponse({
+    description: 'Quick sale created with payment + quick-sale invoice rows.',
+    schema: {
+      type: 'object',
+      properties: {
+        sale_invoice_id: { type: 'string', example: 'INV-QUICK-001' },
+        total: { type: 'number', example: 1500.0 },
+        payment: { type: 'object', additionalProperties: true },
+        quick_sales: {
+          type: 'array',
+          items: { type: 'object', additionalProperties: true },
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'Validation failed or bad input.' })
+  async createQuickSale(@Body() dto: CreateQuickSaleDto) {
+    return this.cashierService.createQuickSale(dto);
+  }
+
+  @Get('quick-sales')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'List quick sales with payment details.',
+  })
+  @ApiOkResponse({ type: QuickSaleRecordDto, isArray: true })
+  async listQuickSales() {
+    return this.cashierService.getQuickSales();
+  }
+
+  @Get('bill-history/:userId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Bill history for a user: today summary + latest drawer exchange + recent bills (by sale_invoice_id).',
+  })
+  @ApiParam({ name: 'userId', type: Number, example: 1 })
+  @ApiOkResponse({ type: BillHistoryDto })
+  async getBillHistory(
+    @Param('userId', ParseIntPipe) userId: number,
+   
+  ) {
+    return this.cashierService.getBillHistory(userId);
+  }
+
+  @Get('bill-history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary:
+      'Bill history for the authenticated user: today summary + latest drawer exchange + recent bills.',
+  })
+  @ApiOkResponse({ type: BillHistoryDto })
+  async getBillHistoryForCurrentUser(@CurrentUser() user: any) {
+    const userId = this.resolveUserId(user);
+    return this.cashierService.getBillHistory(userId);
   }
 
   @Get('returns')
@@ -333,12 +504,15 @@ export class CashierController {
   })
   @ApiBadRequestResponse({ description: 'Validation error' })
   async updateStockFromInvoicesPayload(
-    @Body() payload: UpdateStockFromInvoicesPayloadDto,
+    @Body() payload: Record<string, any>,
     @Query('allOrNothing', new ParseBoolPipe({ optional: true }))
     allOrNothing = false,
   ): Promise<StockApplyResultDto> {
+    const normalized: UpdateStockFromInvoicesPayloadDto = {
+      invoices: Array.isArray(payload?.invoices) ? payload.invoices : [],
+    };
     return this.cashierService.updateStockFromInvoicesPayload(
-      payload,
+      normalized,
       allOrNothing,
     );
   }
@@ -400,5 +574,16 @@ export class CashierController {
   })
   async getDrawerById(@Param('id', ParseIntPipe) id: number) {
     return this.cashierService.getDrawerById(id);
+  }
+
+  private resolveUserId(user: any): number {
+    const candidate = user?.userId ?? user?.sub ?? user?.id;
+    const numericId = Number(candidate ?? NaN);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      throw new BadRequestException(
+        'Authenticated user id is missing or invalid.',
+      );
+    }
+    return numericId;
   }
 }
