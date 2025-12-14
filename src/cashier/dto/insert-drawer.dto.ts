@@ -9,10 +9,12 @@ export class InsertDrawerDto {
   amount!: number;
 
   @ApiProperty({ example: 'Opening float' })
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString()
   reason!: string;
 
-  @ApiProperty({ example: 'IN' })
+  @ApiProperty({ example: 'IN', enum: ['IN', 'OUT'] })
+  @Transform(({ value }) => String(value).toUpperCase())
   @IsString()
   type!: string;
 
