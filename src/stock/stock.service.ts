@@ -20,6 +20,8 @@ import { GetLowStockDto } from './dto/get-low-stock.dto';
 import { Prisma } from '../../generated/prisma-client';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateSupplierDto } from '../supplier/dto/update-supplier.dto';
+import { UpdateSupplierStatusDto } from './dto/update-supplier-status.dto';
+import { SupplierStatus } from '../../generated/prisma-client';
 
 @Injectable()
 export class StockService {
@@ -444,6 +446,26 @@ export class StockService {
         );
       }
       this.handlePrismaError(err, 'deleteSupplier');
+    }
+  }
+
+  // ---- SUPPLIER: Change status only ----
+  async updateSupplierStatus(dto: UpdateSupplierStatusDto) {
+    const supplierId = Number(dto.supplierId);
+    if (!Number.isInteger(supplierId) || supplierId <= 0) {
+      throw new BadRequestException('supplierId must be a positive integer');
+    }
+
+    await this.ensureSupplierExists(supplierId);
+
+    try {
+      const updated = await this.prisma.supplier.update({
+        where: { id: supplierId },
+        data: { status: dto.status as SupplierStatus },
+      });
+      return { id: updated.id, status: updated.status };
+    } catch (err) {
+      this.handlePrismaError(err, 'updateSupplierStatus');
     }
   }
 

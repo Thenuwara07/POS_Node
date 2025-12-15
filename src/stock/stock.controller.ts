@@ -52,6 +52,7 @@ import { RestockItemDto } from './dto/restock-item.dto';
 import { GetLowStockDto } from './dto/get-low-stock.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateSupplierDto } from '../supplier/dto/update-supplier.dto';
+import { UpdateSupplierStatusDto } from './dto/update-supplier-status.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -345,6 +346,18 @@ export class StockController {
   @ApiBadRequestResponse({ description: 'Invalid id or FK constraint prevents delete' })
   async deleteSupplier(@Param('id', ParseIntPipe) id: number) {
     return this.stockService.deleteSupplier(id);
+  }
+
+  // --- SUPPLIER: Change status only ---
+  @Patch('supplier-status')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Change supplier status' })
+  @ApiOkResponse({ description: 'Supplier status updated', schema: { type: 'object', properties: { id: { type: 'number', example: 3 }, status: { type: 'string', example: 'ACTIVE' } } } })
+  @ApiBadRequestResponse({ description: 'Invalid supplierId or status' })
+  async updateSupplierStatus(@Body() dto: UpdateSupplierStatusDto) {
+    return this.stockService.updateSupplierStatus(dto);
   }
 
 
