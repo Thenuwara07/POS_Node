@@ -16,6 +16,7 @@ import {
   ParseIntPipe,
   Query,
   BadRequestException,
+  Delete,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -26,13 +27,14 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
-  ApiInternalServerErrorResponse,
   ApiBody,
   ApiNotFoundResponse,
+  ApiParam,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -48,6 +50,7 @@ import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
 import { RestockItemDto } from './dto/restock-item.dto';
 import { GetLowStockDto } from './dto/get-low-stock.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -268,6 +271,48 @@ export class StockController {
       this.logger.error('Failed to fetch categories', err.stack);
       throw new InternalServerErrorException('Failed to fetch categories');
     }
+  }
+
+  // --- CATEGORY: Update ---
+  @Patch('categories/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update a category (name/color/image)' })
+  @UseInterceptors(FileInterceptor('image', categoryImageMulterOptions()))
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', example: 'Electronics' },
+        colorCode: { type: 'string', example: '#00FF00' },
+        image: { type: 'string', format: 'binary' },
+        imageBase64: { type: 'string', example: 'data:image/png;base64,iVBOR...' },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'Category updated.' })
+  async updateCategory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCategoryDto,
+    @UploadedFile() file?: Express.Multer.File,
+    @Req() req?: Request,
+  ) {
+    const userId = this.extractUserIdFromRequest(req);
+    return this.stockService.updateCategory(id, dto, file, userId);
+  }
+
+  // --- CATEGORY: Delete ---
+  @Delete('categories/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete a category by id' })
+  @ApiParam({ name: 'id', type: Number, example: 5 })
+  @ApiOkResponse({ description: 'Category deleted', schema: { type: 'object', properties: { deleted: { type: 'number', example: 5 } } } })
+  @ApiBadRequestResponse({ description: 'Invalid id or FK constraint prevents delete' })
+  async deleteCategory(@Param('id', ParseIntPipe) id: number) {
+    return this.stockService.deleteCategory(id);
   }
 
 

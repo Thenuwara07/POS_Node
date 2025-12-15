@@ -18,6 +18,7 @@ import { RestockDto } from './dto/restock.dto';
 import { RestockItemDto } from './dto/restock-item.dto';
 import { GetLowStockDto } from './dto/get-low-stock.dto';
 import { Prisma } from '../../generated/prisma-client';
+import { UpdateCategoryDto } from './dto/update-category.dto';
 
 @Injectable()
 export class StockService {
@@ -316,6 +317,74 @@ export class StockService {
     } catch (err) {
       this.logger.error('Failed to fetch categories', err.stack);
       throw new InternalServerErrorException('Failed to fetch categories');
+    }
+  }
+
+  // ---- CATEGORY: Update ----
+  async updateCategory(
+    categoryId: number,
+    dto: UpdateCategoryDto,
+    file?: Express.Multer.File,
+    userId?: number,
+  ) {
+    this.logger.log(`Updating category id=${categoryId}`, {
+      userId,
+      hasFile: !!file,
+      hasBase64: !!dto.imageBase64,
+    });
+
+    await this.ensureCategoryExists(categoryId);
+
+    let imagePath: string | undefined;
+    if (file) {
+      const absPath = file.path.replace(/\\/g, '/');
+      const idx = absPath.indexOf('/uploads/');
+      imagePath = idx >= 0 ? absPath.slice(idx + 1) : absPath;
+    } else if (dto.imageBase64) {
+      imagePath = this.imageStorage.saveBase64CategoryImage(dto.imageBase64);
+    }
+
+    const data: Prisma.CategoryUpdateInput = {};
+    if (dto.category) data.category = dto.category;
+    if (dto.colorCode) {
+      data.colorCode = dto.colorCode.startsWith('#')
+        ? dto.colorCode.toUpperCase()
+        : ('#' + dto.colorCode).toUpperCase();
+    }
+    if (imagePath !== undefined) {
+      data.categoryImage = imagePath;
+    }
+    // updatedBy relation not in Prisma model; skip setting updater for now.
+
+    try {
+      const updated = await this.prisma.category.update({
+        where: { id: categoryId },
+        data,
+      });
+      this.logger.log(`Category updated: ${updated.id}`);
+      return updated;
+    } catch (err) {
+      this.logger.error('Failed to update category', err.stack);
+      this.handlePrismaError(err, 'updateCategory');
+    }
+  }
+
+  // ---- CATEGORY: Delete ----
+  async deleteCategory(categoryId: number) {
+    this.logger.log(`Deleting category id=${categoryId}`);
+    await this.ensureCategoryExists(categoryId);
+
+    try {
+      const deleted = await this.prisma.category.delete({ where: { id: categoryId } });
+      return { deleted: deleted.id };
+    } catch (err: any) {
+      if (err?.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete category while items or relations reference it',
+        );
+      }
+      this.logger.error('Failed to delete category', err.stack);
+      throw new InternalServerErrorException('Failed to delete category');
     }
   }
 
