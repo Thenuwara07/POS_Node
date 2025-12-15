@@ -180,6 +180,27 @@ export class CashierService {
     return out;
   }
 
+  // Simple list of all categories (id, category, colorCode, categoryImage)
+  async listCategories(): Promise<
+    Array<{ id: number; category: string; colorCode: string; categoryImage: string | null }>
+  > {
+    const categories = await this.prisma.category.findMany({
+      orderBy: { id: 'asc' },
+      select: {
+        id: true,
+        category: true,
+        colorCode: true,
+        categoryImage: true,
+      },
+    });
+    return categories.map((c) => ({
+      id: c.id,
+      category: c.category,
+      colorCode: c.colorCode,
+      categoryImage: c.categoryImage ?? null,
+    }));
+  }
+
   async getAllPayments(): Promise<PaymentRecordDto[]> {
     const rows = await this.prisma.payment.findMany({
       orderBy: { date: 'desc' },
