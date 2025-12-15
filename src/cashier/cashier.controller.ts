@@ -85,6 +85,20 @@ export class CashierController {
     return this.cashierService.getCategoriesWithItemsAndBatches();
   }
 
+  // --- CATEGORIES: List all (simple) ---
+  @Get('categories')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CASHIER', 'MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'List all categories (id, category, colorCode, categoryImage)' })
+  @ApiOkResponse({
+    description: 'Categories fetched.',
+    schema: { type: 'array', items: { type: 'object', additionalProperties: true } },
+  })
+  async listCategories() {
+    return this.cashierService.listCategories();
+  }
+
   @Get('payments')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('CASHIER', 'MANAGER')
