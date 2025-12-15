@@ -51,6 +51,7 @@ import { RestockDto } from './dto/restock.dto';
 import { RestockItemDto } from './dto/restock-item.dto';
 import { GetLowStockDto } from './dto/get-low-stock.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateSupplierDto } from '../supplier/dto/update-supplier.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -313,6 +314,37 @@ export class StockController {
   @ApiBadRequestResponse({ description: 'Invalid id or FK constraint prevents delete' })
   async deleteCategory(@Param('id', ParseIntPipe) id: number) {
     return this.stockService.deleteCategory(id);
+  }
+
+  // --- SUPPLIER: Update ---
+  @Patch('suppliers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update a supplier' })
+  @ApiParam({ name: 'id', type: Number, example: 3 })
+  @ApiOkResponse({ description: 'Supplier updated.' })
+  @ApiBadRequestResponse({ description: 'Validation or relation error' })
+  async updateSupplier(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSupplierDto,
+    @Req() req?: Request,
+  ) {
+    const userId = this.extractUserIdFromRequest(req);
+    return this.stockService.updateSupplier(id, dto, userId);
+  }
+
+  // --- SUPPLIER: Delete ---
+  @Delete('suppliers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete a supplier by id' })
+  @ApiParam({ name: 'id', type: Number, example: 3 })
+  @ApiOkResponse({ description: 'Supplier deleted', schema: { type: 'object', properties: { deleted: { type: 'number', example: 3 } } } })
+  @ApiBadRequestResponse({ description: 'Invalid id or FK constraint prevents delete' })
+  async deleteSupplier(@Param('id', ParseIntPipe) id: number) {
+    return this.stockService.deleteSupplier(id);
   }
 
 
