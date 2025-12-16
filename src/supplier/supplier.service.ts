@@ -20,9 +20,7 @@ export class SupplierService {
 
   async createSupplier(dto: CreateSupplierDto, userId?: number) {
     try {
-      const color = dto.colorCode
-        ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#${dto.colorCode}`).toUpperCase()
-        : '#000000';
+      const color = this.normalizeColor(dto.colorCode);
 
       return await this.prisma.supplier.create({
         data: {
@@ -62,9 +60,8 @@ export class SupplierService {
     // ensure exists
     await this.getSupplierById(id);
 
-    const color = dto.colorCode
-      ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#${dto.colorCode}`).toUpperCase()
-      : undefined;
+    const color =
+      dto.colorCode === undefined ? undefined : this.normalizeColor(dto.colorCode);
 
     try {
       const updateData: any = {
@@ -105,6 +102,19 @@ export class SupplierService {
     } catch (err) {
       this.handlePrismaError(err, 'deleteSupplier');
     }
+  }
+
+  private normalizeColor(input?: string, defaultColor = '#0EA5E9'): string {
+    if (input == null) return defaultColor;
+    const trimmed = input.trim();
+    if (!trimmed) return defaultColor;
+
+    const hex = trimmed.startsWith('#') ? trimmed.slice(1) : trimmed;
+    const upper = hex.toUpperCase();
+    if (!/^[0-9A-F]{6}$/.test(upper)) {
+      throw new BadRequestException('colorCode must be 6-digit hex (RRGGBB or #RRGGBB)');
+    }
+    return `#${upper}`;
   }
 
   private async ensureSupplierExists(supplierId: number) {
