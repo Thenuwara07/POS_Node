@@ -918,14 +918,51 @@ export class CashierService {
       userId: uid,
       saleInvoiceId: { not: null },
     };
-
-   
-
     const payments = await this.prisma.payment.findMany({
-      
+      where,
+      orderBy: { date: 'desc' },
+      select: {
+        id: true,
+        amount: true,
+        remainAmount: true,
+        date: true,
+        fileName: true,
+        type: true,
+        saleInvoiceId: true,
+        userId: true,
+        customerContact: true,
+        discountType: true,
+        discountValue: true,
+        cashAmount: true,
+        cardAmount: true,
+        invoices: {
+          select: {
+            batchId: true,
+            itemId: true,
+            quantity: true,
+            unitSaledPrice: true,
+            item: {
+              select: {
+                name: true,
+                category: { select: { category: true } },
+              },
+            },
+          },
+        },
+      },
     });
 
-    const bills = payments.map((p) => this.mapPaymentRecord(p));
+    const bills: PaymentWithItemsDto[] = payments.map((p) => ({
+      ...this.mapPaymentRecord(p),
+      items: (p.invoices ?? []).map((inv) => ({
+        item_id: inv.itemId,
+        batch_id: inv.batchId,
+        quantity: inv.quantity,
+        unit_saled_price: inv.unitSaledPrice,
+        name: inv.item?.name ?? null,
+        category: inv.item?.category?.category ?? null,
+      })),
+    }));
 
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
