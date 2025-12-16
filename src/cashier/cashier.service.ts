@@ -10,6 +10,7 @@ import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { ItemDto } from './dto/item.dto';
 import { BatchDto } from './dto/batch.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
+import { PaymentWithItemsDto } from './dto/payment-with-items.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateQuickSaleDto } from './dto/create-quick-sale.dto';
 import { QuickSaleRecordDto } from './dto/quick-sale-record.dto';
@@ -222,7 +223,7 @@ export class CashierService {
     return rows.map((p) => this.mapPaymentRecord(p));
   }
 
-  async getAllInvoices(): Promise<PaymentRecordDto[]> {
+  async getAllInvoices(): Promise<PaymentWithItemsDto[]> {
     const rows = await this.prisma.payment.findMany({
       where: { saleInvoiceId: { not: null } },
       orderBy: { date: 'desc' },
@@ -238,10 +239,36 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
+        cashAmount: true,
+        cardAmount: true,
+        invoices: {
+          select: {
+            batchId: true,
+            itemId: true,
+            quantity: true,
+            unitSaledPrice: true,
+            item: {
+              select: {
+                name: true,
+                category: { select: { category: true } },
+              },
+            },
+          },
+        },
       },
     });
 
-    return rows.map((p) => this.mapPaymentRecord(p));
+    return rows.map((p) => ({
+      ...this.mapPaymentRecord(p),
+      items: (p.invoices ?? []).map((inv) => ({
+        item_id: inv.itemId,
+        batch_id: inv.batchId,
+        quantity: inv.quantity,
+        unit_saled_price: inv.unitSaledPrice,
+        name: inv.item?.name ?? null,
+        category: inv.item?.category?.category ?? null,
+      })),
+    }));
   }
 
   async insertPayment(dto: CreatePaymentDto): Promise<PaymentRecordDto> {
@@ -339,16 +366,6 @@ export class CashierService {
   ): Promise<{ count: number; stock?: StockApplyResultDto }> {
     const saleId = dto.sale_invoice_id;
 
-    const payment = await this.prisma.payment.findUnique({
-      where: { saleInvoiceId: saleId },
-      select: { saleInvoiceId: true },
-    });
-    if (!payment) {
-      throw new NotFoundException(
-        `Payment with sale_invoice_id=${saleId} not found`,
-      );
-    }
-
     if (!dto.invoices?.length) {
       return { count: 0 };
     }
@@ -365,6 +382,16 @@ export class CashierService {
       let createdCount = 0;
 
       const result = await this.prisma.$transaction(async (tx) => {
+        const payment = await tx.payment.findUnique({
+          where: { saleInvoiceId: saleId },
+          select: { saleInvoiceId: true, amount: true, remainAmount: true },
+        });
+        if (!payment) {
+          throw new NotFoundException(
+            `Payment with sale_invoice_id=${saleId} not found`,
+          );
+        }
+
         const data: Array<{
           batchId: string;
           itemId: number;
@@ -434,10 +461,26 @@ export class CashierService {
         `);
 
         const totalAmount = Number(sumRows?.[0]?.total ?? 0);
+        const paidAmount = Number(payment.amount ?? 0);
+
+        // Prevent under/over counting: invoices must reflect what was paid
+        if (
+          paidAmount > 0 &&
+          Math.abs(totalAmount - paidAmount) > 0.01
+        ) {
+          throw new BadRequestException(
+            `Invoice total (${totalAmount}) does not match paid amount (${paidAmount}). Add all paid items or fix prices/quantities.`,
+          );
+        }
+
+        const remainAmount = Math.min(
+          Number(payment.remainAmount ?? 0),
+          totalAmount,
+        );
 
         await tx.payment.update({
           where: { saleInvoiceId: saleId },
-          data: { amount: totalAmount },
+          data: { amount: totalAmount, remainAmount },
         });
 
         createdCount = r.count;
@@ -875,14 +918,51 @@ export class CashierService {
       userId: uid,
       saleInvoiceId: { not: null },
     };
-
-   
-
     const payments = await this.prisma.payment.findMany({
-      
+      where,
+      orderBy: { date: 'desc' },
+      select: {
+        id: true,
+        amount: true,
+        remainAmount: true,
+        date: true,
+        fileName: true,
+        type: true,
+        saleInvoiceId: true,
+        userId: true,
+        customerContact: true,
+        discountType: true,
+        discountValue: true,
+        cashAmount: true,
+        cardAmount: true,
+        invoices: {
+          select: {
+            batchId: true,
+            itemId: true,
+            quantity: true,
+            unitSaledPrice: true,
+            item: {
+              select: {
+                name: true,
+                category: { select: { category: true } },
+              },
+            },
+          },
+        },
+      },
     });
 
-    const bills = payments.map((p) => this.mapPaymentRecord(p));
+    const bills: PaymentWithItemsDto[] = payments.map((p) => ({
+      ...this.mapPaymentRecord(p),
+      items: (p.invoices ?? []).map((inv) => ({
+        item_id: inv.itemId,
+        batch_id: inv.batchId,
+        quantity: inv.quantity,
+        unit_saled_price: inv.unitSaledPrice,
+        name: inv.item?.name ?? null,
+        category: inv.item?.category?.category ?? null,
+      })),
+    }));
 
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());

@@ -1,7 +1,16 @@
 // supplier/dto/create-supplier.dto.ts
 // supplier/dto/create-supplier.dto.ts
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches, MaxLength, IsBoolean, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  IsBoolean,
+  IsEnum,
+} from 'class-validator';
 import { SupplierStatus } from '../../../generated/prisma-client';
 
 export class CreateSupplierDto {
@@ -45,9 +54,14 @@ export class CreateSupplierDto {
   @MaxLength(2000)
   notes?: string;
 
-  @ApiPropertyOptional({ description: 'Defaults to #000000 if omitted' })
+  @ApiPropertyOptional({
+    description: 'Hex color used for supplier badge/cards (e.g. brand color). Defaults to #0EA5E9.',
+    example: '#0EA5E9',
+  })
   @IsOptional()
-  @Matches(/^#?[0-9A-Fa-f]{6}$/, { message: 'colorCode must be RRGGBB or #RRGGBB' })
+  @Matches(/^#?[0-9A-Fa-f]{6}$/, {
+    message: 'colorCode must be 6-digit hex (RRGGBB or #RRGGBB)',
+  })
   colorCode?: string;
 
   @ApiPropertyOptional({ enum: SupplierStatus, default: SupplierStatus.ACTIVE })
