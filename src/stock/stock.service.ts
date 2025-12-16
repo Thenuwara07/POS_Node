@@ -18,6 +18,10 @@ import { RestockDto } from './dto/restock.dto';
 import { RestockItemDto } from './dto/restock-item.dto';
 import { GetLowStockDto } from './dto/get-low-stock.dto';
 import { Prisma } from '../../generated/prisma-client';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateSupplierDto } from '../supplier/dto/update-supplier.dto';
+import { UpdateSupplierStatusDto } from './dto/update-supplier-status.dto';
+import { SupplierStatus } from '../../generated/prisma-client';
 
 @Injectable()
 export class StockService {
@@ -316,6 +320,152 @@ export class StockService {
     } catch (err) {
       this.logger.error('Failed to fetch categories', err.stack);
       throw new InternalServerErrorException('Failed to fetch categories');
+    }
+  }
+
+  // ---- CATEGORY: Update ----
+  async updateCategory(
+    categoryId: number,
+    dto: UpdateCategoryDto,
+    file?: Express.Multer.File,
+    userId?: number,
+  ) {
+    this.logger.log(`Updating category id=${categoryId}`, {
+      userId,
+      hasFile: !!file,
+      hasBase64: !!dto.imageBase64,
+    });
+
+    await this.ensureCategoryExists(categoryId);
+
+    let imagePath: string | undefined;
+    if (file) {
+      const absPath = file.path.replace(/\\/g, '/');
+      const idx = absPath.indexOf('/uploads/');
+      imagePath = idx >= 0 ? absPath.slice(idx + 1) : absPath;
+    } else if (dto.imageBase64) {
+      imagePath = this.imageStorage.saveBase64CategoryImage(dto.imageBase64);
+    }
+
+    const data: Prisma.CategoryUpdateInput = {};
+    if (dto.category) data.category = dto.category;
+    if (dto.colorCode) {
+      data.colorCode = dto.colorCode.startsWith('#')
+        ? dto.colorCode.toUpperCase()
+        : ('#' + dto.colorCode).toUpperCase();
+    }
+    if (imagePath !== undefined) {
+      data.categoryImage = imagePath;
+    }
+    // updatedBy relation not in Prisma model; skip setting updater for now.
+
+    try {
+      const updated = await this.prisma.category.update({
+        where: { id: categoryId },
+        data,
+      });
+      this.logger.log(`Category updated: ${updated.id}`);
+      return updated;
+    } catch (err) {
+      this.logger.error('Failed to update category', err.stack);
+      this.handlePrismaError(err, 'updateCategory');
+    }
+  }
+
+  // ---- CATEGORY: Delete ----
+  async deleteCategory(categoryId: number) {
+    this.logger.log(`Deleting category id=${categoryId}`);
+    await this.ensureCategoryExists(categoryId);
+
+    try {
+      const deleted = await this.prisma.category.delete({ where: { id: categoryId } });
+      return { deleted: deleted.id };
+    } catch (err: any) {
+      if (err?.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete category while items or relations reference it',
+        );
+      }
+      this.logger.error('Failed to delete category', err.stack);
+      throw new InternalServerErrorException('Failed to delete category');
+    }
+  }
+
+  // ---- SUPPLIER: Update ----
+  async updateSupplier(
+    supplierId: number,
+    dto: UpdateSupplierDto,
+    userId?: number,
+  ) {
+    this.logger.log(`Updating supplier id=${supplierId}`);
+    await this.ensureSupplierExists(supplierId);
+
+    const color = dto.colorCode
+      ? (dto.colorCode.startsWith('#') ? dto.colorCode : `#${dto.colorCode}`).toUpperCase()
+      : undefined;
+
+    const data: Prisma.SupplierUpdateInput = {};
+
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.brand !== undefined) data.brand = dto.brand;
+    if (dto.contact !== undefined) data.contact = dto.contact;
+    if (dto.email !== undefined) data.email = dto.email ?? null;
+    if (dto.address !== undefined) data.address = dto.address ?? null;
+    if (dto.location !== undefined) data.location = dto.location ?? null;
+    if (dto.notes !== undefined) data.notes = dto.notes ?? null;
+    if (color !== undefined) data.colorCode = color;
+    if (dto.status !== undefined) data.status = dto.status;
+    if (dto.preferred !== undefined) data.preferred = dto.preferred ? 1 : 0;
+    if (dto.active !== undefined) data.active = dto.active;
+    if (userId) data.updatedBy = { connect: { id: userId } };
+
+    try {
+      return await this.prisma.supplier.update({
+        where: { id: supplierId },
+        data,
+      });
+    } catch (err) {
+      this.handlePrismaError(err, 'updateSupplier');
+    }
+  }
+
+  // ---- SUPPLIER: Delete ----
+  async deleteSupplier(supplierId: number) {
+    this.logger.log(`Deleting supplier id=${supplierId}`);
+    await this.ensureSupplierExists(supplierId);
+
+    try {
+      const deleted = await this.prisma.supplier.delete({
+        where: { id: supplierId },
+      });
+      return { deleted: deleted.id };
+    } catch (err: any) {
+      if (err?.code === 'P2003') {
+        throw new BadRequestException(
+          'Cannot delete supplier while items/stock reference it',
+        );
+      }
+      this.handlePrismaError(err, 'deleteSupplier');
+    }
+  }
+
+  // ---- SUPPLIER: Change status only ----
+  async updateSupplierStatus(dto: UpdateSupplierStatusDto) {
+    const supplierId = Number(dto.supplierId);
+    if (!Number.isInteger(supplierId) || supplierId <= 0) {
+      throw new BadRequestException('supplierId must be a positive integer');
+    }
+
+    await this.ensureSupplierExists(supplierId);
+
+    try {
+      const updated = await this.prisma.supplier.update({
+        where: { id: supplierId },
+        data: { status: dto.status as SupplierStatus },
+      });
+      return { id: updated.id, status: updated.status };
+    } catch (err) {
+      this.handlePrismaError(err, 'updateSupplierStatus');
     }
   }
 
