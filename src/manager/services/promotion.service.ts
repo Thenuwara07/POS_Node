@@ -17,6 +17,23 @@ function daysToString(days?: number[]): string | null | undefined {
   return days.sort((a, b) => a - b).join(',');
 }
 
+function parseCsvIds(raw?: string | null): number[] {
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((val) => Number(String(val).trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+}
+
+function tryParseJson(raw?: string | null): any | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
 /** Serialize scopeValue:
  *  - ALL => ''
  *  - ITEM/CATEGORY => '1,2,3'
@@ -26,6 +43,17 @@ function serializeScopeValue(
   dto: CreatePromotionDto | UpdatePromotionDto,
 ): string | undefined {
   if (dto.scopeKind === ScopeKind.ALL) return '';
+  if (dto.type !== PromotionType.BUY_X_GET_Y) {
+    const ids =
+      dto.scopeKind === ScopeKind.ITEM
+        ? dto.itemIds
+        : dto.scopeKind === ScopeKind.CATEGORY
+          ? dto.categoryIds
+          : undefined;
+    if (Array.isArray(ids) && ids.length > 0) {
+      return ids.map((n: any) => String(n)).join(',');
+    }
+  }
   if (!dto.scopeValue || dto.scopeValue.length === 0) return '';
   const first = dto.scopeValue[0] as any;
   if (dto.type === PromotionType.BUY_X_GET_Y && typeof first === 'object') {
@@ -34,13 +62,49 @@ function serializeScopeValue(
   return dto.scopeValue.map(String).join(',');
 }
 
+function shapePromotion(rule: any) {
+  if (!rule) return rule;
+
+  let itemIds: number[] | null = null;
+  let categoryIds: number[] | null = null;
+
+  if (rule.type === PromotionType.BUY_X_GET_Y) {
+    const parsed = tryParseJson(rule.scopeValue);
+    if (parsed && typeof parsed === 'object') {
+      if (Array.isArray((parsed as any).itemIds)) {
+        const ids = (parsed as any).itemIds
+          .map((n: any) => Number(n))
+          .filter((n: number) => Number.isInteger(n) && n > 0);
+        itemIds = ids.length ? ids : null;
+      }
+      if (Array.isArray((parsed as any).categoryIds)) {
+        const ids = (parsed as any).categoryIds
+          .map((n: any) => Number(n))
+          .filter((n: number) => Number.isInteger(n) && n > 0);
+        categoryIds = ids.length ? ids : null;
+      }
+      return { ...rule, itemIds, categoryIds };
+    }
+  }
+
+  if (rule.scopeKind === ScopeKind.ITEM) {
+    const ids = parseCsvIds(rule.scopeValue);
+    itemIds = ids.length ? ids : null;
+  } else if (rule.scopeKind === ScopeKind.CATEGORY) {
+    const ids = parseCsvIds(rule.scopeValue);
+    categoryIds = ids.length ? ids : null;
+  }
+
+  return { ...rule, itemIds, categoryIds };
+}
+
 @Injectable()
 export class PromotionService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreatePromotionDto) {
     const now = BigInt(Date.now());
-    return this.prisma.priceRule.create({
+    const created = await this.prisma.priceRule.create({
       data: {
         name: dto.name,
         type: dto.type,
@@ -62,6 +126,7 @@ export class PromotionService {
         updatedById: dto.createdById ?? null,
       },
     });
+    return shapePromotion(created);
   }
 
   async findAll(params?: {
@@ -95,28 +160,31 @@ export class PromotionService {
 
     return {
       meta: { page, pageSize, total, pages: Math.ceil(total / pageSize) },
-      items,
+      items: items.map(shapePromotion),
     };
   }
 
   async findOne(id: number) {
     const rule = await this.prisma.priceRule.findUnique({ where: { id } });
     if (!rule) throw new NotFoundException('Promotion not found');
-    return rule;
+    return shapePromotion(rule);
   }
 
   async update(id: number, dto: UpdatePromotionDto) {
     await this.ensure(id);
     const now = BigInt(Date.now());
 
-    return this.prisma.priceRule.update({
+    const updated = await this.prisma.priceRule.update({
       where: { id },
       data: {
         name: dto.name,
         type: dto.type,
         scopeKind: dto.scopeKind,
         scopeValue:
-          dto.scopeKind !== undefined || dto.scopeValue !== undefined
+          dto.scopeKind !== undefined ||
+          dto.scopeValue !== undefined ||
+          dto.itemIds !== undefined ||
+          dto.categoryIds !== undefined
             ? serializeScopeValue(dto)
             : undefined,
         value: dto.value !== undefined ? Number(dto.value) : undefined,
@@ -136,14 +204,16 @@ export class PromotionService {
         updatedById: (dto as any).updatedById ?? undefined,
       },
     });
+    return shapePromotion(updated);
   }
 
   async toggleActive(id: number, active: boolean) {
     await this.ensure(id);
-    return this.prisma.priceRule.update({
+    const updated = await this.prisma.priceRule.update({
       where: { id },
       data: { active: b2i(active), updatedAt: BigInt(Date.now()) },
     });
+    return shapePromotion(updated);
   }
 
   async remove(id: number) {
