@@ -9,7 +9,6 @@ import {
   Param,
   Patch,
   Post,
-  Query,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -62,22 +61,12 @@ export class PromotionsController {
   // --- List ---
   @Get()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('MANAGER', 'ADMIN')
+  @Roles('MANAGER', 'ADMIN' , 'CASHIER')
   @ApiOperation({ summary: 'List promotions' })
   @ApiOkResponse({ description: 'Promotions fetched.' })
-  async list(
-    @Query('q') q?: string,
-    @Query('active') active?: 'true' | 'false',
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-  ) {
+  async list() {
     try {
-      return await this.service.findAll({
-        q,
-        active: typeof active === 'string' ? active === 'true' : undefined,
-        page: page ? Number(page) : undefined,
-        pageSize: pageSize ? Number(pageSize) : undefined,
-      });
+      return await this.service.findAll();
     } catch (err: any) {
       this.logger.error('List promotions failed', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch promotions');
@@ -136,4 +125,3 @@ export class PromotionsController {
     }
   }
 }
-

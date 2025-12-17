@@ -43,9 +43,33 @@ export class CreatePromotionDto {
    * BUY_X_GET_Y -> optionally send a single object: { buyQty, getQty, itemIds? , categoryIds? }
    */
   @IsOptional()
-  @ValidateIf((o) => o.scopeKind !== ScopeKind.ALL || o.type === PromotionType.BUY_X_GET_Y)
+  @ValidateIf((o) => {
+    if (o.type === PromotionType.BUY_X_GET_Y) return true;
+    if (o.scopeKind === ScopeKind.ALL) return false;
+    if (o.scopeKind === ScopeKind.ITEM) return !Array.isArray(o.itemIds);
+    if (o.scopeKind === ScopeKind.CATEGORY) return !Array.isArray(o.categoryIds);
+    return true;
+  })
   @IsArray()
   scopeValue?: (string | number | Record<string, any>)[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @Type(() => Number)
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value.map((n: any) => Number(n)) : undefined,
+  )
+  itemIds?: number[];
+
+  @IsOptional()
+  @IsArray()
+  @ArrayNotEmpty()
+  @Type(() => Number)
+  @Transform(({ value }) =>
+    Array.isArray(value) ? value.map((n: any) => Number(n)) : undefined,
+  )
+  categoryIds?: number[];
 
   /**
    * Main numeric value
