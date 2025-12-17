@@ -19,6 +19,8 @@ import { ManagerMarginsController } from './margins.controller';
 import { MarginsService } from './services/margins.service';
 import { ManagerProfitController } from './profit.controller';
 import { ProfitService } from './services/profit.service';
+import { ManagerFinanceController } from './finance.controller';
+import { FinanceService } from './services/finance.service';
 import { ReportsController } from './reports.controller';
 import { ReportsService } from './services/reports.service';
 import { CreditSalesService } from './services/credit-sales.service';
@@ -35,6 +37,7 @@ import { RefundBillsService } from './services/refund-bills.service';
     ManagerAccountsController,
     ManagerMarginsController,
     ManagerProfitController,
+    ManagerFinanceController,
     ReportsController, // <-- NEW
   ],
   providers: [
@@ -44,6 +47,7 @@ import { RefundBillsService } from './services/refund-bills.service';
     ManagerAccountsService,
     MarginsService,  
     ProfitService,
+    FinanceService,
     ReportsService,
     CreditSalesService,
     DiscountReportService,
@@ -58,6 +62,7 @@ import { RefundBillsService } from './services/refund-bills.service';
     ManagerAccountsService,
     MarginsService,
     ProfitService,
+    FinanceService,
     ReportsService,
     CreditSalesService,
     DiscountReportService,
