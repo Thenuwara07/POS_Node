@@ -53,6 +53,7 @@ import { GetLowStockDto } from './dto/get-low-stock.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateSupplierDto } from '../supplier/dto/update-supplier.dto';
 import { UpdateSupplierStatusDto } from './dto/update-supplier-status.dto';
+import { SupplierStatusDto } from './dto/supplier-status.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -346,6 +347,20 @@ export class StockController {
   @ApiBadRequestResponse({ description: 'Invalid id or FK constraint prevents delete' })
   async deleteSupplier(@Param('id', ParseIntPipe) id: number) {
     return this.stockService.deleteSupplier(id);
+  }
+
+  @Get('supplier-status')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'List supplier statuses for sync/override' })
+  @ApiOkResponse({
+    description: 'Supplier status rows fetched for stockkeeper sync.',
+    type: [SupplierStatusDto],
+  })
+  async listSupplierStatuses() {
+    this.logger.log('Fetching supplier statuses for remote sync');
+    return this.stockService.listSupplierStatuses();
   }
 
   // --- SUPPLIER: Change status only ---
