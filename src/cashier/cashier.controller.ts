@@ -38,6 +38,7 @@ import {
 } from '@nestjs/swagger';
 import { CategoryCatalogDto } from './dto/category-catalog.dto';
 import { PaymentRecordDto } from './dto/payment-record.dto';
+import { PaymentWithItemsDto } from './dto/payment-with-items.dto';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { CreateInvoicesDto } from './dto/create-invoices.dto';
 import { CreateSaleDto } from './dto/create-sale.dto';
@@ -183,8 +184,8 @@ export class CashierController {
   @Roles('CASHIER', 'MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get all invoices (payments with a sale_invoice_id)' })
-  @ApiOkResponse({ description: 'Invoices fetched.', type: PaymentRecordDto, isArray: true })
-  async getAllInvoices(): Promise<PaymentRecordDto[]> {
+  @ApiOkResponse({ description: 'Invoices fetched.', type: PaymentWithItemsDto, isArray: true })
+  async getAllInvoices(): Promise<PaymentWithItemsDto[]> {
     return this.cashierService.getAllInvoices();
   }
 

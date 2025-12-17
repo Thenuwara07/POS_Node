@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { PaymentRecordDto } from './payment-record.dto';
+import { PaymentWithItemsDto } from './payment-with-items.dto';
 
 export class BillHistorySummaryDto {
   @ApiProperty({ example: 120, description: 'Total sales amount for today' })
@@ -37,6 +37,6 @@ export class BillHistoryDto {
   @ApiProperty({ type: BillHistoryLatestExchangeDto, nullable: true })
   latest_exchange!: BillHistoryLatestExchangeDto | null;
 
-  @ApiProperty({ type: PaymentRecordDto, isArray: true })
-  bills!: PaymentRecordDto[];
+  @ApiProperty({ type: PaymentWithItemsDto, isArray: true })
+  bills!: PaymentWithItemsDto[];
 }
