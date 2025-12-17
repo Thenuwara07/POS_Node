@@ -61,7 +61,7 @@ export class PromotionsController {
   // --- List ---
   @Get()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('MANAGER', 'ADMIN')
+  @Roles('MANAGER', 'ADMIN' , 'CASHIER')
   @ApiOperation({ summary: 'List promotions' })
   @ApiOkResponse({ description: 'Promotions fetched.' })
   async list() {
