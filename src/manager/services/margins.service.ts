@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Prisma } from '../../../generated/prisma-client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MarginsQueryDto } from '../dto/margins-query.dto';
 import { MarginsResponseDto } from '../dto/margins-response.dto';
@@ -120,6 +121,56 @@ export class MarginsService {
       // ---------- PRODUCTS (breakdown) ----------
       const qLike = dto.q ? `%${dto.q.toLowerCase()}%` : null;
 
+      const whereClauses: Prisma.Sql[] = [];
+      if (qLike) {
+        whereClauses.push(
+          Prisma.sql`(LOWER(it.name) LIKE ${qLike} OR LOWER(c.category) LIKE ${qLike})`,
+        );
+      }
+      const whereSql = whereClauses.length
+        ? Prisma.sql`WHERE ${Prisma.join(whereClauses, ' AND ')}`
+        : Prisma.sql``;
+
+      const fromTsSql = Prisma.sql`${fromTs}::bigint`;
+      const toTsSql = Prisma.sql`${toTs}::bigint`;
+
+      const base = Prisma.sql`
+        WITH sales AS (
+          SELECT
+            i.item_id,
+            COALESCE(SUM(i.quantity), 0)                      AS sold,
+            COALESCE(SUM(i.quantity * i.unit_saled_price), 0) AS revenue,
+            COALESCE(SUM(i.quantity * s.unit_price), 0)       AS cost
+          FROM invoice i
+          JOIN payment p ON p.sale_invoice_id = i.sale_invoice_id
+          LEFT JOIN stock s
+            ON s.item_id = i.item_id AND s.batch_id = i.batch_id
+          WHERE p.date BETWEEN ${fromTsSql} AND ${toTsSql}
+          GROUP BY i.item_id
+        )
+        SELECT
+          it.id AS item_id,
+          it.name,
+          c.category,
+          COALESCE(sales.sold, 0)    AS sold,
+          COALESCE(sales.revenue, 0) AS revenue,
+          COALESCE(sales.cost, 0)    AS cost
+        FROM item it
+        LEFT JOIN category c ON c.id = it.category_id
+        LEFT JOIN sales ON sales.item_id = it.id
+        ${whereSql}
+        ORDER BY revenue DESC, it.id ASC
+      `;
+
+      const skipValue = Number(dto.skip);
+      const takeValue = Number(dto.take);
+      const skip = Number.isFinite(skipValue)
+        ? Math.max(0, Math.trunc(skipValue))
+        : undefined;
+      const take = Number.isFinite(takeValue)
+        ? Math.max(1, Math.trunc(takeValue))
+        : undefined;
+
       let products: Array<{
         item_id: number | bigint;
         name: string;
@@ -129,8 +180,7 @@ export class MarginsService {
         cost: number | bigint | null;
       }>;
 
-      if (qLike) {
-        // With search filter
+      if (take != null && skip != null) {
         products = await this.prisma.$queryRaw<
           Array<{
             item_id: number | bigint;
@@ -140,29 +190,30 @@ export class MarginsService {
             revenue: number | bigint | null;
             cost: number | bigint | null;
           }>
-        >`
-          SELECT
-            i.item_id,
-            it.name,
-            c.category,
-            COALESCE(SUM(i.quantity), 0)                      AS sold,
-            COALESCE(SUM(i.quantity * i.unit_saled_price), 0) AS revenue,
-            COALESCE(SUM(i.quantity * s.unit_price), 0)       AS cost
-          FROM invoice i
-          JOIN payment p ON p.sale_invoice_id = i.sale_invoice_id
-          JOIN item it    ON it.id = i.item_id
-          LEFT JOIN category c ON c.id = it.category_id
-          LEFT JOIN stock s
-            ON s.item_id = i.item_id AND s.batch_id = i.batch_id
-          WHERE p.date BETWEEN ${fromTs}::bigint AND ${toTs}::bigint
-            AND (LOWER(it.name) LIKE ${qLike} OR LOWER(c.category) LIKE ${qLike})
-          GROUP BY i.item_id, it.name, c.category
-          ORDER BY revenue DESC
-          OFFSET ${dto.skip ?? 0}
-          LIMIT ${dto.take ?? 50}
-        `;
+        >(Prisma.sql`${base} LIMIT ${take} OFFSET ${skip}`);
+      } else if (take != null) {
+        products = await this.prisma.$queryRaw<
+          Array<{
+            item_id: number | bigint;
+            name: string;
+            category: string | null;
+            sold: number | bigint | null;
+            revenue: number | bigint | null;
+            cost: number | bigint | null;
+          }>
+        >(Prisma.sql`${base} LIMIT ${take}`);
+      } else if (skip != null) {
+        products = await this.prisma.$queryRaw<
+          Array<{
+            item_id: number | bigint;
+            name: string;
+            category: string | null;
+            sold: number | bigint | null;
+            revenue: number | bigint | null;
+            cost: number | bigint | null;
+          }>
+        >(Prisma.sql`${base} OFFSET ${skip}`);
       } else {
-        // Without search filter
         products = await this.prisma.$queryRaw<
           Array<{
             item_id: number | bigint;
@@ -172,26 +223,7 @@ export class MarginsService {
             revenue: number | bigint | null;
             cost: number | bigint | null;
           }>
-        >`
-          SELECT
-            i.item_id,
-            it.name,
-            c.category,
-            COALESCE(SUM(i.quantity), 0)                      AS sold,
-            COALESCE(SUM(i.quantity * i.unit_saled_price), 0) AS revenue,
-            COALESCE(SUM(i.quantity * s.unit_price), 0)       AS cost
-          FROM invoice i
-          JOIN payment p ON p.sale_invoice_id = i.sale_invoice_id
-          JOIN item it    ON it.id = i.item_id
-          LEFT JOIN category c ON c.id = it.category_id
-          LEFT JOIN stock s
-            ON s.item_id = i.item_id AND s.batch_id = i.batch_id
-          WHERE p.date BETWEEN ${fromTs}::bigint AND ${toTs}::bigint
-          GROUP BY i.item_id, it.name, c.category
-          ORDER BY revenue DESC
-          OFFSET ${dto.skip ?? 0}
-          LIMIT ${dto.take ?? 50}
-        `;
+        >(base);
       }
 
       const productDtos = products.map((r) => {
