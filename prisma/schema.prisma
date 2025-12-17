@@ -48,6 +48,7 @@ model User {
   name             String
   email            String  @unique
   contact          String
+  nic              String?
   password         String
   role             Role
   colorCode        String  @default("#000000") @map("color_code")

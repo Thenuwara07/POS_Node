@@ -129,6 +129,7 @@ async register(createUserDto: CreateUserDto) {
   const password = createUserDto.password.trim();
   const name = createUserDto.name.trim();
   const contact = createUserDto.contact.trim();
+  const nic = createUserDto.nic.trim();
   const role = createUserDto.role as Role;
 
   const existing = await this.prisma.user.findUnique({ where: { email } });
@@ -140,6 +141,7 @@ async register(createUserDto: CreateUserDto) {
   const userData: any = {
     email,
     contact,
+    nic,
     password: hashedPassword,
     name,
     role,
@@ -152,6 +154,7 @@ async register(createUserDto: CreateUserDto) {
       email: true,
       name: true,
       contact: true,
+      nic: true,
       role: true,
       createdAt: true,
       updatedAt: true,

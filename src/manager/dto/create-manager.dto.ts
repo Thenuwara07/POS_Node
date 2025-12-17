@@ -13,6 +13,10 @@ export class CreateManagerDto {
   contact: string;
 
   @IsString()
+  @IsNotEmpty()
+  nic: string;
+
+  @IsString()
   @MinLength(6)
   password: string;
 
