@@ -36,7 +36,7 @@ export class ManagerService {
   }
 
   // ✅ Create a manager
-  async create(dto: CreateManagerDto) {
+  async create(dto: CreateManagerDto, actorUserId?: number) {
     try {
       const existing = await this.prisma.user.findUnique({
         where: { email: dto.email.toLowerCase() },
@@ -45,6 +45,9 @@ export class ManagerService {
 
       const now = new Date();
       const hashedPassword = dto.password ? await hash(dto.password, 10) : '';
+      const actorIdRaw = Number(actorUserId ?? dto.createdBy ?? NaN);
+      const actorId =
+        Number.isInteger(actorIdRaw) && actorIdRaw > 0 ? actorIdRaw : null;
 
       return await this.prisma.user.create({
         data: {
@@ -57,9 +60,7 @@ export class ManagerService {
           colorCode: dto.colorCode || '#000000',
           createdAt: now,
           updatedAt: now,
-          createdBy: dto.createdBy
-            ? { connect: { id: dto.createdBy } }
-            : undefined,
+          ...(actorId ? { createdById: actorId, updatedById: actorId } : {}),
         },
       });
     } catch (err) {
@@ -105,7 +106,7 @@ export class ManagerService {
   }
 
   // ✅ Update a manager
-  async update(id: number, dto: UpdateManagerDto) {
+  async update(id: number, dto: UpdateManagerDto, actorUserId?: number) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
       if (!existing) throw new NotFoundException('User not found');
@@ -129,6 +130,10 @@ export class ManagerService {
             })()
           : existing.role;
 
+      const actorIdRaw = Number(actorUserId ?? NaN);
+      const actorId =
+        Number.isInteger(actorIdRaw) && actorIdRaw > 0 ? actorIdRaw : null;
+
       return await this.prisma.user.update({
         where: { id },
         data: {
@@ -142,6 +147,7 @@ export class ManagerService {
           role: normalizedRole,
           colorCode: dto.colorCode ?? existing.colorCode,
           updatedAt: new Date(),
+          ...(actorId ? { updatedById: actorId } : {}),
         },
       });
     } catch (err) {
