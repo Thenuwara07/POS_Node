@@ -51,6 +51,7 @@ export class ManagerService {
           name: dto.name,
           email: dto.email.toLowerCase(),
           contact: dto.contact,
+          nic: dto.nic,
           password: hashedPassword,
           role: (dto.role as Role) || Role.MANAGER,
           colorCode: dto.colorCode || '#000000',
@@ -76,6 +77,7 @@ export class ManagerService {
           { name: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
           { contact: { contains: search, mode: 'insensitive' } },
+          { nic: { contains: search, mode: 'insensitive' } },
         ];
       }
       if (role) where.role = role;
@@ -133,6 +135,7 @@ export class ManagerService {
           name: dto.name ?? existing.name,
           email: dto.email?.toLowerCase() ?? existing.email,
           contact: dto.contact ?? existing.contact,
+          nic: dto.nic ?? existing.nic,
           password: dto.password
             ? await hash(dto.password, 10)
             : existing.password,
@@ -282,6 +285,7 @@ export class ManagerService {
           id: true,
           name: true,
           email: true,
+          nic: true,
           role: true,
           createdAt: true,
         },

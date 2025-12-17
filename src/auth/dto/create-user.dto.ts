@@ -28,6 +28,11 @@ export class CreateUserDto {
   @IsNotEmpty()
   contact: string;
 
+  @Transform(({ value }) => String(value ?? '').trim())
+  @IsString()
+  @IsNotEmpty()
+  nic: string;
+
   @Transform(({ value }) => {
     const v = String(value ?? '').trim().toUpperCase();
     return v as Role;
