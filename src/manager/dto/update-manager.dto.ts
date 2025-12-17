@@ -25,6 +25,11 @@ export class UpdateManagerDto {
 
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  nic?: string;
+
+  @IsOptional()
+  @IsString()
   @MinLength(6)
   password?: string;
 
