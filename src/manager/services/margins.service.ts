@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MarginsQueryDto } from '../dto/margins-query.dto';
 import { MarginsResponseDto } from '../dto/margins-response.dto';
+import { ProfitPeriod } from '../dto/profit-period.enum';
 
 const DEFAULT_RANGE_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
@@ -10,10 +11,69 @@ export class MarginsService {
   constructor(private prisma: PrismaService) {}
 
   private range(dto: MarginsQueryDto) {
-    const now = Date.now();
-    const fromTs = dto.fromTs ?? now - DEFAULT_RANGE_MS;
-    const toTs = dto.toTs ?? now;
-    return { fromTs, toTs };
+    const now = new Date();
+    const fromExplicit = this.toOptionalNumber(dto.fromTs);
+    const toExplicit = this.toOptionalNumber(dto.toTs);
+
+    if (fromExplicit !== undefined || toExplicit !== undefined) {
+      const toTs = toExplicit ?? now.getTime();
+      const fromTs =
+        fromExplicit ?? Math.max(0, toTs - DEFAULT_RANGE_MS);
+      return { fromTs, toTs };
+    }
+
+    if (dto.period) {
+      return this.rangeForPeriod(dto.period, now);
+    }
+
+    return {
+      fromTs: now.getTime() - DEFAULT_RANGE_MS,
+      toTs: now.getTime(),
+    };
+  }
+
+  private rangeForPeriod(period: ProfitPeriod, now: Date) {
+    const startOfDay = (d: Date) =>
+      new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+    let from: Date;
+    let to: Date;
+
+    switch (period) {
+      case ProfitPeriod.ALL_TIME:
+        return { fromTs: 0, toTs: now.getTime() };
+      case ProfitPeriod.TODAY:
+        from = startOfDay(now);
+        to = now;
+        break;
+      case ProfitPeriod.WEEK: {
+        const s = startOfDay(new Date(now));
+        s.setDate(s.getDate() - 6);
+        from = s;
+        to = now;
+        break;
+      }
+      case ProfitPeriod.MONTH:
+        from = new Date(now.getFullYear(), now.getMonth(), 1);
+        to = now;
+        break;
+      case ProfitPeriod.YEAR:
+        from = new Date(now.getFullYear(), 0, 1);
+        to = now;
+        break;
+      default:
+        return {
+          fromTs: now.getTime() - DEFAULT_RANGE_MS,
+          toTs: now.getTime(),
+        };
+    }
+
+    return { fromTs: from.getTime(), toTs: to.getTime() };
+  }
+
+  private toOptionalNumber(value: unknown): number | undefined {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
   }
 
   async getMargins(
