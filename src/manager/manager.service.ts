@@ -36,7 +36,7 @@ export class ManagerService {
   }
 
   // ✅ Create a manager
-  async create(dto: CreateManagerDto) {
+  async create(dto: CreateManagerDto, actorUserId?: number) {
     try {
       const existing = await this.prisma.user.findUnique({
         where: { email: dto.email.toLowerCase() },
@@ -45,20 +45,22 @@ export class ManagerService {
 
       const now = new Date();
       const hashedPassword = dto.password ? await hash(dto.password, 10) : '';
+      const actorIdRaw = Number(actorUserId ?? dto.createdBy ?? NaN);
+      const actorId =
+        Number.isInteger(actorIdRaw) && actorIdRaw > 0 ? actorIdRaw : null;
 
       return await this.prisma.user.create({
         data: {
           name: dto.name,
           email: dto.email.toLowerCase(),
           contact: dto.contact,
+          nic: dto.nic,
           password: hashedPassword,
           role: (dto.role as Role) || Role.MANAGER,
           colorCode: dto.colorCode || '#000000',
           createdAt: now,
           updatedAt: now,
-          createdBy: dto.createdBy
-            ? { connect: { id: dto.createdBy } }
-            : undefined,
+          ...(actorId ? { createdById: actorId, updatedById: actorId } : {}),
         },
       });
     } catch (err) {
@@ -76,6 +78,7 @@ export class ManagerService {
           { name: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
           { contact: { contains: search, mode: 'insensitive' } },
+          { nic: { contains: search, mode: 'insensitive' } },
         ];
       }
       if (role) where.role = role;
@@ -103,7 +106,7 @@ export class ManagerService {
   }
 
   // ✅ Update a manager
-  async update(id: number, dto: UpdateManagerDto) {
+  async update(id: number, dto: UpdateManagerDto, actorUserId?: number) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
       if (!existing) throw new NotFoundException('User not found');
@@ -127,18 +130,24 @@ export class ManagerService {
             })()
           : existing.role;
 
+      const actorIdRaw = Number(actorUserId ?? NaN);
+      const actorId =
+        Number.isInteger(actorIdRaw) && actorIdRaw > 0 ? actorIdRaw : null;
+
       return await this.prisma.user.update({
         where: { id },
         data: {
           name: dto.name ?? existing.name,
           email: dto.email?.toLowerCase() ?? existing.email,
           contact: dto.contact ?? existing.contact,
+          nic: dto.nic ?? existing.nic,
           password: dto.password
             ? await hash(dto.password, 10)
             : existing.password,
           role: normalizedRole,
           colorCode: dto.colorCode ?? existing.colorCode,
           updatedAt: new Date(),
+          ...(actorId ? { updatedById: actorId } : {}),
         },
       });
     } catch (err) {
@@ -282,6 +291,7 @@ export class ManagerService {
           id: true,
           name: true,
           email: true,
+          nic: true,
           role: true,
           createdAt: true,
         },

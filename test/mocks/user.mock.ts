@@ -7,6 +7,7 @@ export const mockUser = {
   email: 'test@example.com',
   name: 'Test User',
   contact: '+1234567890',
+  nic: '123456789V',
   password: 'hashedPassword123', // hashed password
   role: Role.Cashier,
   colorCode: '#3b82f6',
@@ -21,6 +22,7 @@ export const mockUserDto: CreateUserDto = {
   password: 'password123',
   name: 'Test User',
   contact: '+1234567890',
+  nic: '123456789V',
   role: Role.Cashier,
 };
 
