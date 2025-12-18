@@ -8,6 +8,7 @@ import { ManagerModule } from './manager/manager.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { InsightModule } from './insights/insight.module';
 import { CashierModule } from './cashier/cashier.module';
+import { HealthController } from './health/health.controller';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { CashierModule } from './cashier/cashier.module';
     InsightModule,
     CashierModule
   ],
-  controllers: [AppController],
+  controllers: [AppController,HealthController],
   providers: [AppService],
 })
 export class AppModule {}
