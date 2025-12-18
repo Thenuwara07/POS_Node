@@ -12,6 +12,7 @@ declare global {
   }
 }
 
+// BigInt JSON support
 if (!(BigInt.prototype as any).toJSON) {
   (BigInt.prototype as any).toJSON = function () {
     const asNumber = Number(this);
@@ -22,45 +23,47 @@ if (!(BigInt.prototype as any).toJSON) {
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Enable CORS
+  /**
+   * ✅ CORS
+   * Flutter mobile apps usually do NOT send an Origin header,
+   * so we allow "no origin" requests.
+   * We still keep your localhost/LAN allow-list for dev/testing.
+   */
   app.enableCors({
     origin: (origin, callback) => {
+      // Allow server-to-server, mobile apps, curl/postman (no origin header)
       if (!origin) return callback(null, true);
-      
+
+      // Allow local dev + LAN
       const ok =
         /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
         /^https?:\/\/192\.168\.\d+\.\d+(:\d+)?$/.test(origin);
 
-      if (ok) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'), false);
-      }
+      if (ok) return callback(null, true);
+
+      // Block unknown browser origins
+      return callback(new Error('Not allowed by CORS'), false);
     },
-    methods: ['GET', 'POST', 'PUT','PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'X-Requested-With',
-      'Accept',
-      'Origin',
-    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
     credentials: false,
   });
 
-  // Global validation
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    transform: true,
-  }));
+  // ✅ Global validation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
 
-  // Serve static files
+  // ✅ Serve static files (uploads)
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
 
-  // Swagger
+  // ✅ Swagger
   const config = new DocumentBuilder()
     .setTitle('POS API')
     .setDescription('Point of Sale System API')
@@ -74,14 +77,20 @@ async function bootstrap() {
         description: 'Enter JWT token without Bearer prefix',
         in: 'header',
       },
-      'JWT-auth', // 🔹 must match your @ApiBearerAuth('JWT-auth')
+      'JWT-auth',
     )
     .addSecurityRequirements('JWT-auth')
     .build();
+
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.listen(process.env.PORT ?? 3001);
-  console.log(`Server running on port ${process.env.PORT ?? 3001}`);
+  /**
+   * ✅ Render requires using its PORT and binding to 0.0.0.0
+   */
+  const port = process.env.PORT ? Number(process.env.PORT) : 3001;
+  await app.listen(port, '0.0.0.0');
+  console.log(`Server running on port ${port}`);
 }
+
 bootstrap();
