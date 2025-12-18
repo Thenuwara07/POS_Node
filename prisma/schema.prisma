@@ -5,8 +5,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL") // pooled (runtime)
+  directUrl = env("DIRECT_URL") // direct (migrations)
 }
 
 // =================== ENUMS ===================
@@ -44,19 +45,19 @@ enum PaymentDiscountType {
 
 // =================== MODELS ===================
 model User {
-  id               Int     @id @default(autoincrement())
+  id               Int      @id @default(autoincrement())
   name             String
-  email            String  @unique
+  email            String   @unique
   contact          String
   nic              String?
   password         String
   role             Role
-  colorCode        String  @default("#000000") @map("color_code")
+  colorCode        String   @default("#000000") @map("color_code")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
-  refreshTokenHash String? @map("refresh_token_hash")
-  passwordSalt     String? @map("password_salt")
-  passwordAlgo     String? @map("password_algo")
+  refreshTokenHash String?  @map("refresh_token_hash")
+  passwordSalt     String?  @map("password_salt")
+  passwordAlgo     String?  @map("password_algo")
 
   // Self-referencing audit
   createdById Int?  @map("created_by")
@@ -88,28 +89,28 @@ model Customer {
   name    String
   contact String @unique
 
-  payments Payment[]
+  payments  Payment[]
   creditors Creditor[]
 
   @@map("customer")
 }
 
 model Supplier {
-  id           Int            @id @default(autoincrement())
-  name         String
-  contact      String
-  email        String?
-  address      String?
-  brand        String
-  colorCode    String         @default("#000000") @map("color_code")
-  location     String?
-  status       SupplierStatus @default(ACTIVE)
-  preferred    Int            @default(0)
-  active       Boolean        @default(true)
-  
-  notes        String?
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id        Int            @id @default(autoincrement())
+  name      String
+  contact   String
+  email     String?
+  address   String?
+  brand     String
+  colorCode String         @default("#000000") @map("color_code")
+  location  String?
+  status    SupplierStatus @default(ACTIVE)
+  preferred Int            @default(0)
+  active    Boolean        @default(true)
+
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   createdById Int?  @map("created_by")
   updatedById Int?  @map("updated_by")
@@ -140,18 +141,18 @@ model Category {
 }
 
 model Item {
-  id           Int     @id @default(autoincrement())
-  name         String
-  barcode      String?  @unique
-  categoryId   Int     @map("category_id")
-  supplierId   Int     @map("supplier_id")
-  reorderLevel Int     @default(0) @map("reorder_level")
-  gradient     String?
-  remark       String?
-  colorCode    String  @default("#000000") @map("color_code")
-  imagePath    String? @map("image_path")
-  createdById  Int?    @map("created_by")
-  status       Int      @default(1) @map("status")
+  id                   Int                   @id @default(autoincrement())
+  name                 String
+  barcode              String?               @unique
+  categoryId           Int                   @map("category_id")
+  supplierId           Int                   @map("supplier_id")
+  reorderLevel         Int                   @default(0) @map("reorder_level")
+  gradient             String?
+  remark               String?
+  colorCode            String                @default("#000000") @map("color_code")
+  imagePath            String?               @map("image_path")
+  createdById          Int?                  @map("created_by")
+  status               Int                   @default(1) @map("status")
   category             Category              @relation(fields: [categoryId], references: [id])
   supplier             Supplier              @relation(fields: [supplierId], references: [id])
   createdBy            User?                 @relation("item_created_by", fields: [createdById], references: [id])
@@ -199,9 +200,9 @@ model Payment {
   discountType    PaymentDiscountType @default(NO) @map("discount_type")
   discountValue   Float               @default(0) @map("discount_value")
 
-  invoices Invoice[]
-  user     User?     @relation(fields: [userId], references: [id])
-  customer Customer? @relation(fields: [customerContact], references: [contact])
+  invoices   Invoice[]
+  user       User?       @relation(fields: [userId], references: [id])
+  customer   Customer?   @relation(fields: [customerContact], references: [contact])
   quickSales QuickSale[] @relation("QuickSalePayment")
 
   @@index([userId])
@@ -225,14 +226,14 @@ model Invoice {
 }
 
 model QuickSale {
-  id            Int     @id @default(autoincrement())
-  saleInvoiceId String  @map("sale_invoice_id")
-  userId        Int?    @map("user_id")
+  id            Int    @id @default(autoincrement())
+  saleInvoiceId String @map("sale_invoice_id")
+  userId        Int?   @map("user_id")
   name          String
   quantity      Int
-  unitCost      Float   @map("unit_cost")
-  unitPrice     Float   @map("unit_price")
-  createdAt     BigInt  @map("created_at")
+  unitCost      Float  @map("unit_cost")
+  unitPrice     Float  @map("unit_price")
+  createdAt     BigInt @map("created_at")
 
   payment Payment? @relation("QuickSalePayment", fields: [saleInvoiceId], references: [saleInvoiceId])
   user    User?    @relation("QuickSaleUser", fields: [userId], references: [id])
@@ -290,7 +291,7 @@ model ReportAudit {
 }
 
 model PriceRule {
-  id               Int     @id @default(autoincrement())   // << was String @id
+  id               Int     @id @default(autoincrement()) // << was String @id
   name             String
   type             String
   scopeKind        String  @map("scope_kind")
@@ -320,13 +321,13 @@ model PriceRule {
 }
 
 model Creditor {
-  id              Int       @id @default(autoincrement())
-  customerContact String    @map("customer_contact")
-  totalDue        Float     @default(0) @map("total_due")
+  id              Int      @id @default(autoincrement())
+  customerContact String   @map("customer_contact")
+  totalDue        Float    @default(0) @map("total_due")
   notes           String?
-  lastPaymentAt   BigInt?   @map("last_payment_at")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  lastPaymentAt   BigInt?  @map("last_payment_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   // optional audit
   createdById Int?  @map("created_by")
@@ -342,22 +343,23 @@ model Creditor {
   @@index([updatedById])
   @@map("creditor")
 }
+
 enum AuthAction {
   LOGIN
   LOGOUT
 }
 
 model AuthLog {
-  id         Int        @id @default(autoincrement())
-  userId     Int?       @map("user_id")
-  email      String?
-  action     AuthAction
-  timestamp  BigInt     @map("ts")
-  ip         String?
-  userAgent  String?    @map("user_agent")
-  meta       Json?
+  id        Int        @id @default(autoincrement())
+  userId    Int?       @map("user_id")
+  email     String?
+  action    AuthAction
+  timestamp BigInt     @map("ts")
+  ip        String?
+  userAgent String?    @map("user_agent")
+  meta      Json?
 
-  user       User?      @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [userId], references: [id])
 
   @@index([userId, timestamp])
   @@map("auth_log")

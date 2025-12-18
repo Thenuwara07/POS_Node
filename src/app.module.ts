@@ -8,6 +8,7 @@ import { ManagerModule } from './manager/manager.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { InsightModule } from './insights/insight.module';
 import { CashierModule } from './cashier/cashier.module';
+import { HealthController } from './health/health.controller';
 import { PerformanceSummaryModule } from './performance-summary/performance-summary.module';
 
 @Module({
@@ -21,7 +22,7 @@ import { PerformanceSummaryModule } from './performance-summary/performance-summ
     CashierModule,
     PerformanceSummaryModule,
   ],
-  controllers: [AppController],
+  controllers: [AppController,HealthController],
   providers: [AppService],
 })
 export class AppModule {}
