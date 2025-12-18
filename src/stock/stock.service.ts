@@ -21,6 +21,7 @@ import { Prisma } from '../../generated/prisma-client';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { UpdateSupplierDto } from '../supplier/dto/update-supplier.dto';
 import { UpdateSupplierStatusDto } from './dto/update-supplier-status.dto';
+import { SupplierStatusDto } from './dto/supplier-status.dto';
 import { SupplierStatus } from '../../generated/prisma-client';
 
 @Injectable()
@@ -466,6 +467,37 @@ export class StockService {
       return { id: updated.id, status: updated.status };
     } catch (err) {
       this.handlePrismaError(err, 'updateSupplierStatus');
+    }
+  }
+
+  async listSupplierStatuses(): Promise<SupplierStatusDto[]> {
+    this.logger.log('Listing supplier statuses for remote sync');
+    try {
+      const suppliers = await this.prisma.supplier.findMany({
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          updatedAt: true,
+        },
+        orderBy: [
+          { name: 'asc' },
+          { id: 'asc' },
+        ],
+      });
+
+      return suppliers.map((supplier) => ({
+        supplierId: supplier.id,
+        supplierName: supplier.name,
+        status: supplier.status,
+        updatedAt: supplier.updatedAt,
+      }));
+    } catch (err) {
+      this.logger.error(
+        'Failed to list supplier statuses',
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw new InternalServerErrorException('Failed to list supplier statuses');
     }
   }
 
