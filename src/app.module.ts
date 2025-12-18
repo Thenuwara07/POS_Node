@@ -9,6 +9,7 @@ import { SupplierModule } from './supplier/supplier.module';
 import { InsightModule } from './insights/insight.module';
 import { CashierModule } from './cashier/cashier.module';
 import { HealthController } from './health/health.controller';
+import { PerformanceSummaryModule } from './performance-summary/performance-summary.module';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { HealthController } from './health/health.controller';
     ManagerModule,
     SupplierModule,
     InsightModule,
-    CashierModule
+    CashierModule,
+    PerformanceSummaryModule,
   ],
   controllers: [AppController,HealthController],
   providers: [AppService],

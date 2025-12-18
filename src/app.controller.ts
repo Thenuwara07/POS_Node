@@ -9,4 +9,10 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
+
+  // Simple health check: returns 1 when the backend responds (online).
+  @Get('health')
+  health(): { status: number } {
+    return { status: 1 };
+  }
 }

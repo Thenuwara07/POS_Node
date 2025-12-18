@@ -16,6 +16,7 @@ import {
   ParseIntPipe,
   Query,
   BadRequestException,
+  Delete,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -26,13 +27,14 @@ import {
   ApiConsumes,
   ApiCreatedResponse,
   ApiForbiddenResponse,
+  ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
   ApiUnauthorizedResponse,
-  ApiInternalServerErrorResponse,
   ApiBody,
   ApiNotFoundResponse,
+  ApiParam,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -48,6 +50,10 @@ import { UpdateItemDto } from './dto/update-item.dto';
 import { RestockDto } from './dto/restock.dto';
 import { RestockItemDto } from './dto/restock-item.dto';
 import { GetLowStockDto } from './dto/get-low-stock.dto';
+import { UpdateCategoryDto } from './dto/update-category.dto';
+import { UpdateSupplierDto } from '../supplier/dto/update-supplier.dto';
+import { UpdateSupplierStatusDto } from './dto/update-supplier-status.dto';
+import { SupplierStatusDto } from './dto/supplier-status.dto';
 
 @ApiTags('Stock')
 @Controller('stock')
@@ -268,6 +274,105 @@ export class StockController {
       this.logger.error('Failed to fetch categories', err.stack);
       throw new InternalServerErrorException('Failed to fetch categories');
     }
+  }
+
+  // --- CATEGORY: Update ---
+  @Patch('categories/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update a category (name/color/image)' })
+  @UseInterceptors(FileInterceptor('image', categoryImageMulterOptions()))
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        category: { type: 'string', example: 'Electronics' },
+        colorCode: { type: 'string', example: '#00FF00' },
+        image: { type: 'string', format: 'binary' },
+        imageBase64: { type: 'string', example: 'data:image/png;base64,iVBOR...' },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'Category updated.' })
+  async updateCategory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCategoryDto,
+    @UploadedFile() file?: Express.Multer.File,
+    @Req() req?: Request,
+  ) {
+    const userId = this.extractUserIdFromRequest(req);
+    return this.stockService.updateCategory(id, dto, file, userId);
+  }
+
+  // --- CATEGORY: Delete ---
+  @Delete('categories/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete a category by id' })
+  @ApiParam({ name: 'id', type: Number, example: 5 })
+  @ApiOkResponse({ description: 'Category deleted', schema: { type: 'object', properties: { deleted: { type: 'number', example: 5 } } } })
+  @ApiBadRequestResponse({ description: 'Invalid id or FK constraint prevents delete' })
+  async deleteCategory(@Param('id', ParseIntPipe) id: number) {
+    return this.stockService.deleteCategory(id);
+  }
+
+  // --- SUPPLIER: Update ---
+  @Patch('suppliers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Update a supplier' })
+  @ApiParam({ name: 'id', type: Number, example: 3 })
+  @ApiOkResponse({ description: 'Supplier updated.' })
+  @ApiBadRequestResponse({ description: 'Validation or relation error' })
+  async updateSupplier(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateSupplierDto,
+    @Req() req?: Request,
+  ) {
+    const userId = this.extractUserIdFromRequest(req);
+    return this.stockService.updateSupplier(id, dto, userId);
+  }
+
+  // --- SUPPLIER: Delete ---
+  @Delete('suppliers/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Delete a supplier by id' })
+  @ApiParam({ name: 'id', type: Number, example: 3 })
+  @ApiOkResponse({ description: 'Supplier deleted', schema: { type: 'object', properties: { deleted: { type: 'number', example: 3 } } } })
+  @ApiBadRequestResponse({ description: 'Invalid id or FK constraint prevents delete' })
+  async deleteSupplier(@Param('id', ParseIntPipe) id: number) {
+    return this.stockService.deleteSupplier(id);
+  }
+
+  @Get('supplier-status')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'List supplier statuses for sync/override' })
+  @ApiOkResponse({
+    description: 'Supplier status rows fetched for stockkeeper sync.',
+    type: [SupplierStatusDto],
+  })
+  async listSupplierStatuses() {
+    this.logger.log('Fetching supplier statuses for remote sync');
+    return this.stockService.listSupplierStatuses();
+  }
+
+  // --- SUPPLIER: Change status only ---
+  @Patch('supplier-status')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('STOCKKEEPER','MANAGER')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({ summary: 'Change supplier status' })
+  @ApiOkResponse({ description: 'Supplier status updated', schema: { type: 'object', properties: { id: { type: 'number', example: 3 }, status: { type: 'string', example: 'ACTIVE' } } } })
+  @ApiBadRequestResponse({ description: 'Invalid supplierId or status' })
+  async updateSupplierStatus(@Body() dto: UpdateSupplierStatusDto) {
+    return this.stockService.updateSupplierStatus(dto);
   }
 
 

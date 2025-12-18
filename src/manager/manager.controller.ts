@@ -8,6 +8,8 @@ import {
   Query,
   Param,
   UseGuards,
+  Req,
+  BadRequestException,
   InternalServerErrorException,
   Logger,
   UsePipes,
@@ -76,9 +78,10 @@ export class ManagerController {
   @ApiForbiddenResponse({ description: 'Insufficient role permissions.' })
   @ApiConflictResponse({ description: 'Email already exists.' })
   @ApiInternalServerErrorResponse({ description: 'Unexpected server error.' })
-  async create(@Body() dto: CreateManagerDto) {
+  async create(@Req() req: any, @Body() dto: CreateManagerDto) {
     try {
-      return await this.managerService.create(dto);
+      const actorUserId = this.resolveUserId(req?.user);
+      return await this.managerService.create(dto, actorUserId);
     } catch (err: any) {
       if (err?.status && err?.response) throw err;
       this.logger.error('Failed to create manager', err?.stack || err);
@@ -124,9 +127,10 @@ export class ManagerController {
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update user details' })
-  async update(@Param('id') id: string, @Body() dto: UpdateManagerDto) {
+  async update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateManagerDto) {
     try {
-      return await this.managerService.update(Number(id), dto);
+      const actorUserId = this.resolveUserId(req?.user);
+      return await this.managerService.update(Number(id), dto, actorUserId);
     } catch (err: any) {
       this.logger.error('Failed to update user', err?.stack || err);
       throw new InternalServerErrorException('Failed to update user');
@@ -473,5 +477,16 @@ export class ManagerController {
       this.logger.error('Failed to fetch daily sales', err?.stack || err);
       throw new InternalServerErrorException('Failed to fetch daily sales');
     }
+  }
+
+  private resolveUserId(user: any): number {
+    const candidate = user?.userId ?? user?.sub ?? user?.id;
+    const numericId = Number(candidate ?? NaN);
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      throw new BadRequestException(
+        'Authenticated user id is missing or invalid.',
+      );
+    }
+    return numericId;
   }
 }
