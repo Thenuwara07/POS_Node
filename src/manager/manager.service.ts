@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   ConflictException,
   Logger,
+  HttpException, // ✅ ADDED
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
@@ -20,8 +21,13 @@ export class ManagerService {
 
   constructor(private prisma: PrismaService) {}
 
-  // 🔹 Centralized Prisma error handler
+  // 🔹 Centralized Prisma error handler (✅ FIXED: do not convert 409/400/404 into 500)
   private handlePrismaError(error: unknown, context: string): never {
+    // ✅ If it's already an HTTP exception (Conflict/BadRequest/NotFound), rethrow it
+    if (error instanceof HttpException) {
+      throw error;
+    }
+
     if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === 'P2002')
         throw new ConflictException(`Duplicate entry detected in ${context}`);
@@ -30,6 +36,7 @@ export class ManagerService {
       if (error.code === 'P2003')
         throw new BadRequestException(`Invalid foreign key in ${context}`);
     }
+
     this.logger.error(`Unexpected error in ${context}`, error as any);
     throw new InternalServerErrorException(`Unexpected error in ${context}`);
   }
@@ -101,10 +108,10 @@ export class ManagerService {
       throw new BadRequestException('Email already exists');
     }
     if (duplicate.contact === contact) {
-      throw new ConflictException('Contact already exists');
+      throw new ConflictException('Contact already exists'); // ✅ stays 409 now
     }
     if (nic && duplicate.nic === nic) {
-      throw new ConflictException('NIC already exists');
+      throw new ConflictException('NIC already exists'); // ✅ stays 409 now
     }
 
     throw new ConflictException('Duplicate entry detected');
@@ -132,10 +139,10 @@ export class ManagerService {
       throw new BadRequestException('Email already exists');
     }
     if (duplicate.contact === contact) {
-      throw new ConflictException('Contact already exists');
+      throw new ConflictException('Contact already exists'); // ✅ stays 409 now
     }
     if (nic && duplicate.nic === nic) {
-      throw new ConflictException('NIC already exists');
+      throw new ConflictException('NIC already exists'); // ✅ stays 409 now
     }
 
     throw new ConflictException('Duplicate entry detected');
@@ -148,7 +155,7 @@ export class ManagerService {
 
       const email = dto.email.toLowerCase();
       const contact = this.normalizeSriLankaMobile(dto.contact); // ✅ normalize
-      const nic = this.normalizeSriLankaNIC(dto.nic) ?? null;    // nic optional
+      const nic = this.normalizeSriLankaNIC(dto.nic) ?? null; // nic optional
 
       // ✅ uniqueness check: email/contact/nic
       await this.ensureUniqueForCreate(email, contact, nic);
@@ -163,8 +170,8 @@ export class ManagerService {
         data: {
           name: dto.name,
           email,
-          contact,         // ✅ stored as +94...
-          nic,             // ✅ normalized (or null)
+          contact, // ✅ stored as +94...
+          nic, // ✅ normalized (or null)
           password: hashedPassword,
           role: (dto.role as Role) || Role.MANAGER,
           colorCode: dto.colorCode || '#000000',
@@ -255,11 +262,9 @@ export class ManagerService {
         data: {
           name: dto.name ?? existing.name,
           email: nextEmail,
-          contact: nextContact,     // ✅ always stored +94...
-          nic: nextNic,             // ✅ normalized / null
-          password: dto.password
-            ? await hash(dto.password, 10)
-            : existing.password,
+          contact: nextContact, // ✅ always stored +94...
+          nic: nextNic, // ✅ normalized / null
+          password: dto.password ? await hash(dto.password, 10) : existing.password,
           role: normalizedRole,
           colorCode: dto.colorCode ?? existing.colorCode,
           updatedAt: new Date(),
@@ -482,7 +487,6 @@ export class ManagerService {
         },
       });
 
-      // Convert epoch (seconds or ms) -> ISO string
       const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
         const ms = n < 1e12 ? n * 1000 : n;
