@@ -16,6 +16,7 @@ import {
   ValidationPipe,
   DefaultValuePipe,
   ParseIntPipe,
+  HttpException, // ✅ ADD (for 409/400 passthrough)
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
@@ -62,6 +63,19 @@ export class ManagerController {
     private readonly creditorService: CreditorService,
   ) {}
 
+  // ✅ ADD: one helper to prevent turning 409/400 into 500
+  private rethrowHttpOr500(err: any, fallbackMessage: string): never {
+    // If service threw ConflictException/BadRequestException/etc, keep it
+    if (err instanceof HttpException) throw err;
+
+    // Also keep legacy Nest error shapes (some libs throw {status,response})
+    if (err?.status && err?.response) throw err;
+
+    // Otherwise wrap unknown into 500
+    this.logger.error(fallbackMessage, err?.stack || err);
+    throw new InternalServerErrorException(fallbackMessage);
+  }
+
   // ----------------------------------------------------------------
   // -------------------------- USER CRUD ----------------------------
   // ----------------------------------------------------------------
@@ -83,9 +97,7 @@ export class ManagerController {
       const actorUserId = this.resolveUserId(req?.user);
       return await this.managerService.create(dto, actorUserId);
     } catch (err: any) {
-      if (err?.status && err?.response) throw err;
-      this.logger.error('Failed to create manager', err?.stack || err);
-      throw new InternalServerErrorException('Failed to create manager');
+      this.rethrowHttpOr500(err, 'Failed to create manager'); // ✅ FIX
     }
   }
 
@@ -96,13 +108,11 @@ export class ManagerController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get all users' })
   @ApiOkResponse({ description: 'Users fetched.' })
-  async findAll(
-  ) {
+  async findAll() {
     try {
       return await this.managerService.findAll();
     } catch (err: any) {
-      this.logger.error('Failed to fetch managers', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch managers');
+      this.rethrowHttpOr500(err, 'Failed to fetch managers'); // ✅ FIX
     }
   }
 
@@ -116,8 +126,7 @@ export class ManagerController {
     try {
       return await this.managerService.findOne(Number(id));
     } catch (err: any) {
-      this.logger.error('Failed to fetch manager', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch manager');
+      this.rethrowHttpOr500(err, 'Failed to fetch manager'); // ✅ FIX
     }
   }
 
@@ -127,13 +136,16 @@ export class ManagerController {
   @Roles('MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update user details' })
-  async update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateManagerDto) {
+  async update(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: UpdateManagerDto,
+  ) {
     try {
       const actorUserId = this.resolveUserId(req?.user);
       return await this.managerService.update(Number(id), dto, actorUserId);
     } catch (err: any) {
-      this.logger.error('Failed to update user', err?.stack || err);
-      throw new InternalServerErrorException('Failed to update user');
+      this.rethrowHttpOr500(err, 'Failed to update user'); // ✅ FIX (keeps 409)
     }
   }
 
@@ -147,8 +159,7 @@ export class ManagerController {
     try {
       return await this.managerService.remove(Number(id));
     } catch (err: any) {
-      this.logger.error('Failed to delete user', err?.stack || err);
-      throw new InternalServerErrorException('Failed to delete user');
+      this.rethrowHttpOr500(err, 'Failed to delete user'); // ✅ FIX
     }
   }
 
@@ -169,8 +180,7 @@ export class ManagerController {
     try {
       return await this.managerService.getTrendingItems(limit, days);
     } catch (err: any) {
-      this.logger.error('Failed to fetch trending items', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch trending items');
+      this.rethrowHttpOr500(err, 'Failed to fetch trending items'); // ✅ FIX
     }
   }
 
@@ -184,8 +194,7 @@ export class ManagerController {
     try {
       return await this.managerService.getAuditLogs(query);
     } catch (err: any) {
-      this.logger.error('Failed to fetch audit logs', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch audit logs');
+      this.rethrowHttpOr500(err, 'Failed to fetch audit logs'); // ✅ FIX
     }
   }
 
@@ -220,9 +229,7 @@ export class ManagerController {
       // If you later add userId in JWT, pass it here
       return await this.creditorService.create(dto /*, userIdFromJwt */);
     } catch (err: any) {
-      if (err?.status && err?.response) throw err;
-      this.logger.error('Failed to create creditor', err?.stack || err);
-      throw new InternalServerErrorException('Failed to create creditor');
+      this.rethrowHttpOr500(err, 'Failed to create creditor'); // ✅ FIX
     }
   }
 
@@ -244,28 +251,9 @@ export class ManagerController {
     try {
       return await this.creditorService.findAll(search, limit, offset);
     } catch (err: any) {
-      if (err?.status && err?.response) throw err;
-      this.logger.error('Failed to fetch creditors', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch creditors');
+      this.rethrowHttpOr500(err, 'Failed to fetch creditors'); // ✅ FIX
     }
   }
-
-  // GET ONE CREDITOR
-  // @Get('creditors/:id')
-  // @UseGuards(AuthGuard('jwt'), RolesGuard)
-  // @Roles('MANAGER')
-  // @ApiBearerAuth('JWT-auth')
-  // @ApiOperation({ summary: 'Get creditor by ID' })
-  // @ApiOkResponse({ description: 'Creditor fetched.' })
-  // async getCreditorById(@Param('id') id: string) {
-  //   try {
-  //     return await this.creditorService.findOne(Number(id));
-  //   } catch (err: any) {
-  //     if (err?.status && err?.response) throw err;
-  //     this.logger.error('Failed to fetch creditor', err?.stack || err);
-  //     throw new InternalServerErrorException('Failed to fetch creditor');
-  //   }
-  // }
 
   // UPDATE CREDITOR
   @Patch('creditors/:id')
@@ -274,16 +262,14 @@ export class ManagerController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Update creditor by ID' })
   @ApiOkResponse({ description: 'Creditor updated.' })
-  async updateCreditor(
-    @Param('id') id: string,
-    @Body() dto: UpdateCreditorDto,
-  ) {
+  async updateCreditor(@Param('id') id: string, @Body() dto: UpdateCreditorDto) {
     try {
-      return await this.creditorService.update(Number(id), dto /*, userIdFromJwt */);
+      return await this.creditorService.update(
+        Number(id),
+        dto /*, userIdFromJwt */,
+      );
     } catch (err: any) {
-      if (err?.status && err?.response) throw err;
-      this.logger.error('Failed to update creditor', err?.stack || err);
-      throw new InternalServerErrorException('Failed to update creditor');
+      this.rethrowHttpOr500(err, 'Failed to update creditor'); // ✅ FIX
     }
   }
 
@@ -298,9 +284,7 @@ export class ManagerController {
     try {
       return await this.creditorService.remove(Number(id));
     } catch (err: any) {
-      if (err?.status && err?.response) throw err;
-      this.logger.error('Failed to delete creditor', err?.stack || err);
-      throw new InternalServerErrorException('Failed to delete creditor');
+      this.rethrowHttpOr500(err, 'Failed to delete creditor'); // ✅ FIX
     }
   }
 
@@ -322,8 +306,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllItems();
     } catch (err: any) {
-      this.logger.error('Failed to fetch items', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch items');
+      this.rethrowHttpOr500(err, 'Failed to fetch items'); // ✅ FIX
     }
   }
 
@@ -341,8 +324,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllCustomers();
     } catch (err: any) {
-      this.logger.error('Failed to fetch customers', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch customers');
+      this.rethrowHttpOr500(err, 'Failed to fetch customers'); // ✅ FIX
     }
   }
 
@@ -360,8 +342,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllUsers();
     } catch (err: any) {
-      this.logger.error('Failed to fetch users', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch users');
+      this.rethrowHttpOr500(err, 'Failed to fetch users'); // ✅ FIX
     }
   }
 
@@ -379,8 +360,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllSuppliers();
     } catch (err: any) {
-      this.logger.error('Failed to fetch suppliers', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch suppliers');
+      this.rethrowHttpOr500(err, 'Failed to fetch suppliers'); // ✅ FIX
     }
   }
 
@@ -398,8 +378,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllStocks();
     } catch (err: any) {
-      this.logger.error('Failed to fetch stocks', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch stocks');
+      this.rethrowHttpOr500(err, 'Failed to fetch stocks'); // ✅ FIX
     }
   }
 
@@ -417,8 +396,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllInvoices();
     } catch (err: any) {
-      this.logger.error('Failed to fetch invoices', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch invoices');
+      this.rethrowHttpOr500(err, 'Failed to fetch invoices'); // ✅ FIX
     }
   }
 
@@ -436,8 +414,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllCardPayments();
     } catch (err: any) {
-      this.logger.error('Failed to fetch card payments', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch card payments');
+      this.rethrowHttpOr500(err, 'Failed to fetch card payments'); // ✅ FIX
     }
   }
 
@@ -455,8 +432,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllCashPayments();
     } catch (err: any) {
-      this.logger.error('Failed to fetch cash payments', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch cash payments');
+      this.rethrowHttpOr500(err, 'Failed to fetch cash payments'); // ✅ FIX
     }
   }
 
@@ -474,8 +450,7 @@ export class ManagerController {
     try {
       return await this.managerService.findAllDailySales();
     } catch (err: any) {
-      this.logger.error('Failed to fetch daily sales', err?.stack || err);
-      throw new InternalServerErrorException('Failed to fetch daily sales');
+      this.rethrowHttpOr500(err, 'Failed to fetch daily sales'); // ✅ FIX
     }
   }
 
