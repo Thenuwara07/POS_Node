@@ -5,7 +5,7 @@ import {
   InternalServerErrorException,
   ConflictException,
   Logger,
-  HttpException, // ✅ ADD
+  HttpException, // ✅ ADDED
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
@@ -21,45 +21,20 @@ export class ManagerService {
 
   constructor(private prisma: PrismaService) {}
 
-  // ✅ Centralized Prisma error handler (FIXED: do not wrap HTTP exceptions)
+  // 🔹 Centralized Prisma error handler (✅ FIXED: do not convert 409/400/404 into 500)
   private handlePrismaError(error: unknown, context: string): never {
-    // ✅ If we already threw Conflict/BadRequest/NotFound etc, keep it
+    // ✅ If it's already an HTTP exception (Conflict/BadRequest/NotFound), rethrow it
     if (error instanceof HttpException) {
       throw error;
     }
 
     if (error instanceof PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        // Optional: make message nicer if we can detect the field
-        const target = (error.meta as any)?.target;
-        const targetStr = Array.isArray(target)
-          ? target.join(',')
-          : String(target ?? '');
-
-        const t = targetStr.toLowerCase();
-
-        if (t.includes('contact') || t.includes('phone')) {
-          throw new ConflictException(
-            "You can’t have two accounts with the same phone number.",
-          );
-        }
-        if (t.includes('email')) {
-          throw new ConflictException('Email already exists');
-        }
-        if (t.includes('nic')) {
-          throw new ConflictException('NIC already exists');
-        }
-
+      if (error.code === 'P2002')
         throw new ConflictException(`Duplicate entry detected in ${context}`);
-      }
-
-      if (error.code === 'P2025') {
+      if (error.code === 'P2025')
         throw new NotFoundException(`Record not found in ${context}`);
-      }
-
-      if (error.code === 'P2003') {
+      if (error.code === 'P2003')
         throw new BadRequestException(`Invalid foreign key in ${context}`);
-      }
     }
 
     this.logger.error(`Unexpected error in ${context}`, error as any);
@@ -70,6 +45,10 @@ export class ManagerService {
   // ✅ Normalization Helpers
   // =========================
 
+  /**
+   * Normalize Sri Lankan mobile to E.164: +947XXXXXXXX
+   * Accepts: 0771234567, 771234567, 94771234567, +94771234567, 0094771234567
+   */
   private normalizeSriLankaMobile(contactRaw: string): string {
     const raw = (contactRaw ?? '').toString().trim().replace(/[\s-]/g, '');
     if (!raw) throw new BadRequestException('Contact is required');
@@ -81,6 +60,7 @@ export class ManagerService {
     if (digits.startsWith('94')) digits = digits.substring(2);
     if (digits.startsWith('0')) digits = digits.substring(1);
 
+    // Now should be 9 digits starting with 7
     if (!/^7\d{8}$/.test(digits)) {
       throw new BadRequestException(
         'Contact must be a valid Sri Lankan mobile number (e.g. 0771234567 or +94771234567).',
@@ -90,14 +70,17 @@ export class ManagerService {
     return `+94${digits}`;
   }
 
+  /**
+   * Normalize NIC: trim + uppercase last char for old NIC.
+   * Accepts: 123456789V / 123456789X / 200012345678
+   */
   private normalizeSriLankaNIC(nicRaw?: string | null): string | null {
     if (nicRaw === undefined || nicRaw === null) return null;
 
     const nic = nicRaw.toString().trim();
     if (!nic) return null;
 
-    if (/^\d{9}[vVxX]$/.test(nic))
-      return nic.slice(0, 9) + nic.slice(9).toUpperCase();
+    if (/^\d{9}[vVxX]$/.test(nic)) return nic.slice(0, 9) + nic.slice(9).toUpperCase();
     if (/^\d{12}$/.test(nic)) return nic;
 
     throw new BadRequestException(
@@ -109,11 +92,8 @@ export class ManagerService {
   // ✅ Uniqueness Helpers
   // =========================
 
-  private async ensureUniqueForCreate(
-    email: string,
-    contact: string,
-    nic: string | null,
-  ) {
+  private async ensureUniqueForCreate(email: string, contact: string, nic: string | null) {
+    // IMPORTANT: nic is optional in schema, so check only if exists
     const or: any[] = [{ email }, { contact }];
     if (nic) or.push({ nic });
 
@@ -128,12 +108,10 @@ export class ManagerService {
       throw new BadRequestException('Email already exists');
     }
     if (duplicate.contact === contact) {
-      throw new ConflictException(
-        "You can’t have two accounts with the same phone number.",
-      );
+      throw new ConflictException('Contact already exists'); // ✅ stays 409 now
     }
     if (nic && duplicate.nic === nic) {
-      throw new ConflictException('NIC already exists');
+      throw new ConflictException('NIC already exists'); // ✅ stays 409 now
     }
 
     throw new ConflictException('Duplicate entry detected');
@@ -161,12 +139,10 @@ export class ManagerService {
       throw new BadRequestException('Email already exists');
     }
     if (duplicate.contact === contact) {
-      throw new ConflictException(
-        "You can’t have two accounts with the same phone number.",
-      );
+      throw new ConflictException('Contact already exists'); // ✅ stays 409 now
     }
     if (nic && duplicate.nic === nic) {
-      throw new ConflictException('NIC already exists');
+      throw new ConflictException('NIC already exists'); // ✅ stays 409 now
     }
 
     throw new ConflictException('Duplicate entry detected');
@@ -178,9 +154,10 @@ export class ManagerService {
       const now = new Date();
 
       const email = dto.email.toLowerCase();
-      const contact = this.normalizeSriLankaMobile(dto.contact);
-      const nic = this.normalizeSriLankaNIC(dto.nic) ?? null;
+      const contact = this.normalizeSriLankaMobile(dto.contact); // ✅ normalize
+      const nic = this.normalizeSriLankaNIC(dto.nic) ?? null; // nic optional
 
+      // ✅ uniqueness check: email/contact/nic
       await this.ensureUniqueForCreate(email, contact, nic);
 
       const hashedPassword = dto.password ? await hash(dto.password, 10) : '';
@@ -193,8 +170,8 @@ export class ManagerService {
         data: {
           name: dto.name,
           email,
-          contact,
-          nic,
+          contact, // ✅ stored as +94...
+          nic, // ✅ normalized (or null)
           password: hashedPassword,
           role: (dto.role as Role) || Role.MANAGER,
           colorCode: dto.colorCode || '#000000',
@@ -233,6 +210,7 @@ export class ManagerService {
     }
   }
 
+  // ✅ Get one manager
   async findOne(id: number) {
     try {
       const manager = await this.prisma.user.findUnique({ where: { id } });
@@ -243,6 +221,7 @@ export class ManagerService {
     }
   }
 
+  // ✅ Update a manager
   async update(id: number, dto: UpdateManagerDto, actorUserId?: number) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
@@ -250,15 +229,17 @@ export class ManagerService {
 
       const nextEmail = dto.email ? dto.email.toLowerCase() : existing.email;
 
+      // ✅ normalize only if provided, else keep existing
       const nextContact = dto.contact
         ? this.normalizeSriLankaMobile(dto.contact)
         : existing.contact;
 
       const nextNic =
         dto.nic !== undefined
-          ? this.normalizeSriLankaNIC(dto.nic)
+          ? this.normalizeSriLankaNIC(dto.nic) // can become null if empty
           : (existing.nic ?? null);
 
+      // ✅ uniqueness check exclude current user id
       await this.ensureUniqueForUpdate(id, nextEmail, nextContact, nextNic);
 
       const normalizedRole =
@@ -281,8 +262,8 @@ export class ManagerService {
         data: {
           name: dto.name ?? existing.name,
           email: nextEmail,
-          contact: nextContact,
-          nic: nextNic,
+          contact: nextContact, // ✅ always stored +94...
+          nic: nextNic, // ✅ normalized / null
           password: dto.password ? await hash(dto.password, 10) : existing.password,
           role: normalizedRole,
           colorCode: dto.colorCode ?? existing.colorCode,
@@ -295,6 +276,7 @@ export class ManagerService {
     }
   }
 
+  // ✅ Delete a user
   async remove(id: number) {
     try {
       const existing = await this.prisma.user.findUnique({ where: { id } });
@@ -305,6 +287,7 @@ export class ManagerService {
     }
   }
 
+  // ✅ Verify login
   async verifyLogin(email: string, password: string) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -319,6 +302,7 @@ export class ManagerService {
     }
   }
 
+  // ✅ Get trending items (based on reportAudit table)
   async getTrendingItems(limit = 5, days = 7) {
     try {
       const fromTimestamp = Date.now() - days * 24 * 60 * 60 * 1000;
@@ -340,14 +324,17 @@ export class ManagerService {
     }
   }
 
+  // ✅ Get audit logs
   async getAuditLogs(query: ManagerAuditLogsQueryDto) {
     try {
       const limit = Math.min(200, Math.max(1, query.limit ?? 50));
       const offset = Math.max(0, query.offset ?? 0);
 
       const andFilters: Prisma.AuthLogWhereInput[] = [];
-      if (query.fromTs) andFilters.push({ timestamp: { gte: BigInt(query.fromTs) } });
-      if (query.toTs) andFilters.push({ timestamp: { lte: BigInt(query.toTs) } });
+      if (query.fromTs)
+        andFilters.push({ timestamp: { gte: BigInt(query.fromTs) } });
+      if (query.toTs)
+        andFilters.push({ timestamp: { lte: BigInt(query.toTs) } });
 
       const where: Prisma.AuthLogWhereInput = {
         ...(query.userId ? { userId: query.userId } : {}),
@@ -376,13 +363,15 @@ export class ManagerService {
 
   async findAllItems() {
     try {
-      return await this.prisma.item.findMany({
+      const items = await this.prisma.item.findMany({
         orderBy: { id: 'desc' },
         select: {
           id: true,
           name: true,
           barcode: true,
-          category: { select: { id: true, category: true } },
+          category: {
+            select: { id: true, category: true },
+          },
           stock: {
             select: {
               itemId: true,
@@ -393,6 +382,8 @@ export class ManagerService {
           },
         },
       });
+
+      return items;
     } catch (err) {
       this.handlePrismaError(err, 'findAllItems');
     }
@@ -400,10 +391,16 @@ export class ManagerService {
 
   async findAllCustomers() {
     try {
-      return await this.prisma.customer.findMany({
+      const customers = await this.prisma.customer.findMany({
         orderBy: { id: 'desc' },
-        select: { id: true, name: true, contact: true },
+        select: {
+          id: true,
+          name: true,
+          contact: true,
+        },
       });
+
+      return customers;
     } catch (err) {
       this.handlePrismaError(err, 'findAllCustomers');
     }
@@ -411,10 +408,19 @@ export class ManagerService {
 
   async findAllUsers() {
     try {
-      return await this.prisma.user.findMany({
+      const users = await this.prisma.user.findMany({
         orderBy: { id: 'desc' },
-        select: { id: true, name: true, email: true, nic: true, role: true, createdAt: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          nic: true,
+          role: true,
+          createdAt: true,
+        },
       });
+
+      return users;
     } catch (err) {
       this.handlePrismaError(err, 'findAllUsers');
     }
@@ -422,10 +428,19 @@ export class ManagerService {
 
   async findAllSuppliers() {
     try {
-      return await this.prisma.supplier.findMany({
+      const suppliers = await this.prisma.supplier.findMany({
         orderBy: { id: 'desc' },
-        select: { id: true, name: true, contact: true, email: true, address: true, status: true },
+        select: {
+          id: true,
+          name: true,
+          contact: true,
+          email: true,
+          address: true,
+          status: true,
+        },
       });
+
+      return suppliers;
     } catch (err) {
       this.handlePrismaError(err, 'findAllSuppliers');
     }
@@ -433,7 +448,7 @@ export class ManagerService {
 
   async findAllStocks() {
     try {
-      return await this.prisma.stock.findMany({
+      const stocks = await this.prisma.stock.findMany({
         orderBy: { id: 'desc' },
         select: {
           id: true,
@@ -443,12 +458,16 @@ export class ManagerService {
               name: true,
               barcode: true,
               reorderLevel: true,
-              category: { select: { id: true, category: true } },
+              category: {
+                select: { id: true, category: true },
+              },
             },
           },
           quantity: true,
         },
       });
+
+      return stocks;
     } catch (err) {
       this.handlePrismaError(err, 'findAllStocks');
     }
@@ -468,11 +487,16 @@ export class ManagerService {
         },
       });
 
-      return invoicesRaw.map((i) => {
+      const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
         const ms = n < 1e12 ? n * 1000 : n;
-        return { ...i, date: new Date(ms).toISOString() };
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
       });
+
+      return invoices;
     } catch (err) {
       this.handlePrismaError(err, 'findAllInvoices');
     }
@@ -483,14 +507,25 @@ export class ManagerService {
       const invoicesRaw = await this.prisma.payment.findMany({
         where: { type: 'CARD' },
         orderBy: { id: 'desc' },
-        select: { id: true, saleInvoiceId: true, date: true, type: true, amount: true },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true,
+          type: true,
+          amount: true,
+        },
       });
 
-      return invoicesRaw.map((i) => {
+      const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
         const ms = n < 1e12 ? n * 1000 : n;
-        return { ...i, date: new Date(ms).toISOString() };
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
       });
+
+      return invoices;
     } catch (err) {
       this.handlePrismaError(err, 'findAllCardPayments');
     }
@@ -501,14 +536,25 @@ export class ManagerService {
       const invoicesRaw = await this.prisma.payment.findMany({
         where: { type: 'CASH' },
         orderBy: { id: 'desc' },
-        select: { id: true, saleInvoiceId: true, date: true, type: true, amount: true },
+        select: {
+          id: true,
+          saleInvoiceId: true,
+          date: true,
+          type: true,
+          amount: true,
+        },
       });
 
-      return invoicesRaw.map((i) => {
+      const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
         const ms = n < 1e12 ? n * 1000 : n;
-        return { ...i, date: new Date(ms).toISOString() };
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
       });
+
+      return invoices;
     } catch (err) {
       this.handlePrismaError(err, 'findAllCashPayments');
     }
@@ -527,11 +573,16 @@ export class ManagerService {
         },
       });
 
-      return invoicesRaw.map((i) => {
+      const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
         const ms = n < 1e12 ? n * 1000 : n;
-        return { ...i, date: new Date(ms).toISOString() };
+        return {
+          ...i,
+          date: new Date(ms).toISOString(),
+        };
       });
+
+      return invoices;
     } catch (err) {
       this.handlePrismaError(err, 'findAllInvoices');
     }
