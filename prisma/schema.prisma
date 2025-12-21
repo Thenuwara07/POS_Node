@@ -48,8 +48,8 @@ model User {
   id               Int      @id @default(autoincrement())
   name             String
   email            String   @unique
-  contact          String
-  nic              String?
+  contact          String   @unique        // ✅ make unique
+  nic              String?  @unique        // ✅ make unique (nullable allowed)
   password         String
   role             Role
   colorCode        String   @default("#000000") @map("color_code")
@@ -59,13 +59,11 @@ model User {
   passwordSalt     String?  @map("password_salt")
   passwordAlgo     String?  @map("password_algo")
 
-  // Self-referencing audit
   createdById Int?  @map("created_by")
   updatedById Int?  @map("updated_by")
   createdBy   User? @relation("user_created_by", fields: [createdById], references: [id])
   updatedBy   User? @relation("user_updated_by", fields: [updatedById], references: [id])
 
-  // Back-relations
   createdUsers      User[]        @relation("user_created_by")
   updatedUsers      User[]        @relation("user_updated_by")
   payments          Payment[]

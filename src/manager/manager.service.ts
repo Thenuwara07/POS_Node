@@ -14,7 +14,6 @@ import { hash, compare } from 'bcryptjs';
 import { Prisma, Role } from '../../generated/prisma-client';
 import { ManagerAuditLogsQueryDto } from './dto/manager-audit-logs-query.dto';
 
-
 @Injectable()
 export class ManagerService {
   private readonly logger = new Logger(ManagerService.name);
@@ -35,16 +34,127 @@ export class ManagerService {
     throw new InternalServerErrorException(`Unexpected error in ${context}`);
   }
 
+  // =========================
+  // ✅ Normalization Helpers
+  // =========================
+
+  /**
+   * Normalize Sri Lankan mobile to E.164: +947XXXXXXXX
+   * Accepts: 0771234567, 771234567, 94771234567, +94771234567, 0094771234567
+   */
+  private normalizeSriLankaMobile(contactRaw: string): string {
+    const raw = (contactRaw ?? '').toString().trim().replace(/[\s-]/g, '');
+    if (!raw) throw new BadRequestException('Contact is required');
+
+    let digits = raw;
+
+    if (digits.startsWith('+')) digits = digits.substring(1);
+    if (digits.startsWith('0094')) digits = digits.substring(2); // 0094 -> 94
+    if (digits.startsWith('94')) digits = digits.substring(2);
+    if (digits.startsWith('0')) digits = digits.substring(1);
+
+    // Now should be 9 digits starting with 7
+    if (!/^7\d{8}$/.test(digits)) {
+      throw new BadRequestException(
+        'Contact must be a valid Sri Lankan mobile number (e.g. 0771234567 or +94771234567).',
+      );
+    }
+
+    return `+94${digits}`;
+  }
+
+  /**
+   * Normalize NIC: trim + uppercase last char for old NIC.
+   * Accepts: 123456789V / 123456789X / 200012345678
+   */
+  private normalizeSriLankaNIC(nicRaw?: string | null): string | null {
+    if (nicRaw === undefined || nicRaw === null) return null;
+
+    const nic = nicRaw.toString().trim();
+    if (!nic) return null;
+
+    if (/^\d{9}[vVxX]$/.test(nic)) return nic.slice(0, 9) + nic.slice(9).toUpperCase();
+    if (/^\d{12}$/.test(nic)) return nic;
+
+    throw new BadRequestException(
+      'NIC must be a valid Sri Lankan NIC (old: 123456789V, new: 200012345678).',
+    );
+  }
+
+  // =========================
+  // ✅ Uniqueness Helpers
+  // =========================
+
+  private async ensureUniqueForCreate(email: string, contact: string, nic: string | null) {
+    // IMPORTANT: nic is optional in schema, so check only if exists
+    const or: any[] = [{ email }, { contact }];
+    if (nic) or.push({ nic });
+
+    const duplicate = await this.prisma.user.findFirst({
+      where: { OR: or },
+      select: { id: true, email: true, contact: true, nic: true },
+    });
+
+    if (!duplicate) return;
+
+    if (duplicate.email?.toLowerCase() === email) {
+      throw new BadRequestException('Email already exists');
+    }
+    if (duplicate.contact === contact) {
+      throw new ConflictException('Contact already exists');
+    }
+    if (nic && duplicate.nic === nic) {
+      throw new ConflictException('NIC already exists');
+    }
+
+    throw new ConflictException('Duplicate entry detected');
+  }
+
+  private async ensureUniqueForUpdate(
+    id: number,
+    email: string,
+    contact: string,
+    nic: string | null,
+  ) {
+    const or: any[] = [{ email }, { contact }];
+    if (nic) or.push({ nic });
+
+    const duplicate = await this.prisma.user.findFirst({
+      where: {
+        AND: [{ id: { not: id } }, { OR: or }],
+      },
+      select: { id: true, email: true, contact: true, nic: true },
+    });
+
+    if (!duplicate) return;
+
+    if (duplicate.email?.toLowerCase() === email) {
+      throw new BadRequestException('Email already exists');
+    }
+    if (duplicate.contact === contact) {
+      throw new ConflictException('Contact already exists');
+    }
+    if (nic && duplicate.nic === nic) {
+      throw new ConflictException('NIC already exists');
+    }
+
+    throw new ConflictException('Duplicate entry detected');
+  }
+
   // ✅ Create a manager
   async create(dto: CreateManagerDto, actorUserId?: number) {
     try {
-      const existing = await this.prisma.user.findUnique({
-        where: { email: dto.email.toLowerCase() },
-      });
-      if (existing) throw new BadRequestException('Email already exists');
-
       const now = new Date();
+
+      const email = dto.email.toLowerCase();
+      const contact = this.normalizeSriLankaMobile(dto.contact); // ✅ normalize
+      const nic = this.normalizeSriLankaNIC(dto.nic) ?? null;    // nic optional
+
+      // ✅ uniqueness check: email/contact/nic
+      await this.ensureUniqueForCreate(email, contact, nic);
+
       const hashedPassword = dto.password ? await hash(dto.password, 10) : '';
+
       const actorIdRaw = Number(actorUserId ?? dto.createdBy ?? NaN);
       const actorId =
         Number.isInteger(actorIdRaw) && actorIdRaw > 0 ? actorIdRaw : null;
@@ -52,9 +162,9 @@ export class ManagerService {
       return await this.prisma.user.create({
         data: {
           name: dto.name,
-          email: dto.email.toLowerCase(),
-          contact: dto.contact,
-          nic: dto.nic,
+          email,
+          contact,         // ✅ stored as +94...
+          nic,             // ✅ normalized (or null)
           password: hashedPassword,
           role: (dto.role as Role) || Role.MANAGER,
           colorCode: dto.colorCode || '#000000',
@@ -66,7 +176,6 @@ export class ManagerService {
     } catch (err) {
       this.handlePrismaError(err, 'createManager');
     }
-
   }
 
   // ✅ Get all managers
@@ -111,13 +220,20 @@ export class ManagerService {
       const existing = await this.prisma.user.findUnique({ where: { id } });
       if (!existing) throw new NotFoundException('User not found');
 
-      // Ensure unique email
-      if (dto.email && dto.email.toLowerCase() !== existing.email.toLowerCase()) {
-        const emailExists = await this.prisma.user.findUnique({
-          where: { email: dto.email.toLowerCase() },
-        });
-        if (emailExists) throw new BadRequestException('Email already exists');
-      }
+      const nextEmail = dto.email ? dto.email.toLowerCase() : existing.email;
+
+      // ✅ normalize only if provided, else keep existing
+      const nextContact = dto.contact
+        ? this.normalizeSriLankaMobile(dto.contact)
+        : existing.contact;
+
+      const nextNic =
+        dto.nic !== undefined
+          ? this.normalizeSriLankaNIC(dto.nic) // can become null if empty
+          : (existing.nic ?? null);
+
+      // ✅ uniqueness check exclude current user id
+      await this.ensureUniqueForUpdate(id, nextEmail, nextContact, nextNic);
 
       const normalizedRole =
         dto.role !== undefined
@@ -138,9 +254,9 @@ export class ManagerService {
         where: { id },
         data: {
           name: dto.name ?? existing.name,
-          email: dto.email?.toLowerCase() ?? existing.email,
-          contact: dto.contact ?? existing.contact,
-          nic: dto.nic ?? existing.nic,
+          email: nextEmail,
+          contact: nextContact,     // ✅ always stored +94...
+          nic: nextNic,             // ✅ normalized / null
           password: dto.password
             ? await hash(dto.password, 10)
             : existing.password,
@@ -210,8 +326,10 @@ export class ManagerService {
       const offset = Math.max(0, query.offset ?? 0);
 
       const andFilters: Prisma.AuthLogWhereInput[] = [];
-      if (query.fromTs) andFilters.push({ timestamp: { gte: BigInt(query.fromTs) } });
-      if (query.toTs) andFilters.push({ timestamp: { lte: BigInt(query.toTs) } });
+      if (query.fromTs)
+        andFilters.push({ timestamp: { gte: BigInt(query.fromTs) } });
+      if (query.toTs)
+        andFilters.push({ timestamp: { lte: BigInt(query.toTs) } });
 
       const where: Prisma.AuthLogWhereInput = {
         ...(query.userId ? { userId: query.userId } : {}),
@@ -246,8 +364,8 @@ export class ManagerService {
           id: true,
           name: true,
           barcode: true,
-          category: { 
-            select: { id: true, category: true } 
+          category: {
+            select: { id: true, category: true },
           },
           stock: {
             select: {
@@ -303,7 +421,6 @@ export class ManagerService {
     }
   }
 
-
   async findAllSuppliers() {
     try {
       const suppliers = await this.prisma.supplier.findMany({
@@ -330,19 +447,18 @@ export class ManagerService {
         orderBy: { id: 'desc' },
         select: {
           id: true,
-          item: { 
-            select: { 
+          item: {
+            select: {
               id: true,
               name: true,
               barcode: true,
               reorderLevel: true,
-              category: { 
-                select: { id: true, category: true } 
+              category: {
+                select: { id: true, category: true },
               },
-            } 
+            },
           },
           quantity: true,
-
         },
       });
 
@@ -359,7 +475,7 @@ export class ManagerService {
         select: {
           id: true,
           saleInvoiceId: true,
-          date: true, // bigint epoch (likely seconds)
+          date: true,
           customer: { select: { name: true } },
           type: true,
           amount: true,
@@ -369,7 +485,7 @@ export class ManagerService {
       // Convert epoch (seconds or ms) -> ISO string
       const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
-        const ms = n < 1e12 ? n * 1000 : n; // 10 digits => seconds, 13 => ms
+        const ms = n < 1e12 ? n * 1000 : n;
         return {
           ...i,
           date: new Date(ms).toISOString(),
@@ -382,8 +498,7 @@ export class ManagerService {
     }
   }
 
-
-   async findAllCardPayments() {
+  async findAllCardPayments() {
     try {
       const invoicesRaw = await this.prisma.payment.findMany({
         where: { type: 'CARD' },
@@ -397,10 +512,9 @@ export class ManagerService {
         },
       });
 
-      // Convert epoch (seconds or ms) -> ISO string
       const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
-        const ms = n < 1e12 ? n * 1000 : n; 
+        const ms = n < 1e12 ? n * 1000 : n;
         return {
           ...i,
           date: new Date(ms).toISOString(),
@@ -427,10 +541,9 @@ export class ManagerService {
         },
       });
 
-      // Convert epoch (seconds or ms) -> ISO string
       const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
-        const ms = n < 1e12 ? n * 1000 : n; 
+        const ms = n < 1e12 ? n * 1000 : n;
         return {
           ...i,
           date: new Date(ms).toISOString(),
@@ -449,17 +562,16 @@ export class ManagerService {
         orderBy: { id: 'desc' },
         select: {
           saleInvoiceId: true,
-          date: true, // bigint epoch (likely seconds)
+          date: true,
           customer: { select: { name: true } },
           type: true,
           amount: true,
         },
       });
 
-      // Convert epoch (seconds or ms) -> ISO string
       const invoices = invoicesRaw.map((i) => {
         const n = typeof i.date === 'bigint' ? Number(i.date) : (i.date as number);
-        const ms = n < 1e12 ? n * 1000 : n; // 10 digits => seconds, 13 => ms
+        const ms = n < 1e12 ? n * 1000 : n;
         return {
           ...i,
           date: new Date(ms).toISOString(),
@@ -471,5 +583,4 @@ export class ManagerService {
       this.handlePrismaError(err, 'findAllInvoices');
     }
   }
-
 }
