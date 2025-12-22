@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsInt, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
@@ -41,4 +41,10 @@ export class InvoiceLineDto {
   @IsOptional()
   @IsNumber()
   unit_saled_price?: number;
+
+  @ApiPropertyOptional({ name: 'tiny_discount', example: 0 })
+  @Transform(({ value }) => (value == null ? 0 : Number(value)))
+  @IsNumber()
+  @Min(0)
+  tiny_discount?: number;
 }
