@@ -45,7 +45,7 @@ export class InsightController {
   // -------- HEADER --------
   @Get('header')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Get KPI header (total sales, customers, products)' })
   @ApiOkResponse({ description: 'Header fetched', type: SalesHeaderDto })
@@ -71,7 +71,7 @@ export class InsightController {
   // -------- TOP ITEMS --------
   @Get('top-items')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Top selling items for the period' })
   @ApiOkResponse({ description: 'Top items fetched', type: [TopItemSummaryDto] })
@@ -94,7 +94,7 @@ export class InsightController {
   // -------- SALES TREND (chart) --------
   @Get('sales-trend')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('STOCKKEEPER')
+  @Roles('STOCKKEEPER','MANAGER')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Daily sales totals for charting' })
   @ApiOkResponse({ description: 'Trend fetched', type: [ChartSeriesDto] })
