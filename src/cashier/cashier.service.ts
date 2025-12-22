@@ -46,6 +46,16 @@ import {
 export class CashierService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private sumTinyDiscounts(
+    invoices?: Array<{ tinyDiscount?: number | null }>,
+  ): number {
+    return Number(
+      (invoices ?? [])
+        .reduce((sum, inv) => sum + Number(inv?.tinyDiscount ?? 0), 0)
+        .toFixed(2),
+    );
+  }
+
   private mapPaymentRecord(p: {
     id: number;
     amount: number;
@@ -58,9 +68,9 @@ export class CashierService {
     customerContact: string | null;
     discountType: PaymentDiscountType;
     discountValue: number;
-    tinyDiscount: number;
     cashAmount?: number;
     cardAmount?: number;
+    invoices?: Array<{ tinyDiscount?: number | null }>;
   }): PaymentRecordDto {
     const dateNum =
       typeof p.date === 'bigint'
@@ -90,7 +100,7 @@ export class CashierService {
       customer_contact: p.customerContact ?? null,
       discount_type: discountStr,
       discount_value: p.discountValue,
-      tiny_discount: Number(p.tinyDiscount ?? 0),
+      total_tiny_discounts: this.sumTinyDiscounts(p.invoices),
     };
   }
 
@@ -219,7 +229,11 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
-        tinyDiscount: true,
+        invoices: {
+          select: {
+            tinyDiscount: true,
+          },
+        },
       },
     });
 
@@ -242,7 +256,6 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
-        tinyDiscount: true,
         cashAmount: true,
         cardAmount: true,
         invoices: {
@@ -350,7 +363,6 @@ export class CashierService {
           customerContact,
           discountType: discountEnum,
           discountValue: dto.discount_value ?? 0,
-          tinyDiscount: dto.tiny_discount ?? 0,
         },
       });
 
@@ -569,7 +581,6 @@ export class CashierService {
         quantity: number;
         unitSaledPrice: number;
         saleInvoiceId: string;
-        tinyDiscount: number;
       }> = [];
       let totalAmount = 0;
       let totalTinyFromLines = 0;
@@ -633,20 +644,13 @@ export class CashierService {
           itemId,
           quantity: Math.trunc(qty),
           unitSaledPrice: priceNum,
-          tinyDiscount: lineTinyDiscount,
           saleInvoiceId: saleInvoiceId,
         });
         totalAmount += lineTotal;
         totalTinyFromLines += lineTinyDiscount;
       }
 
-      const fallbackTiny = Number(dto.tiny_discount ?? 0);
-      const tinyDiscountValue =
-        totalTinyFromLines > 0
-          ? totalTinyFromLines
-          : Number.isFinite(fallbackTiny) && fallbackTiny > 0
-          ? Math.min(fallbackTiny, totalAmount)
-          : 0;
+      const tinyDiscountValue = Math.max(0, totalTinyFromLines);
       const paymentAmount = Math.max(0, totalAmount - tinyDiscountValue);
 
       let remainAmount = Number(dto.remain_amount ?? 0);
@@ -701,7 +705,6 @@ export class CashierService {
         customerContact,
         discountType: discountEnum,
         discountValue: dto.discount_value ?? 0,
-        tinyDiscount: tinyDiscountValue,
       },
       });
 
@@ -811,12 +814,7 @@ export class CashierService {
       total = 0;
     }
 
-    const rawTinyDiscount = Number(dto.tiny_discount ?? 0);
-    const tinyDiscountValue =
-      Number.isFinite(rawTinyDiscount) && rawTinyDiscount > 0
-        ? Math.min(rawTinyDiscount, total)
-        : 0;
-    const totalAfterTiny = Math.max(0, total - tinyDiscountValue);
+    const totalAfterTiny = Math.max(0, total);
 
     let remainAmount = Number(dto.remain_amount ?? 0);
     if (!Number.isFinite(remainAmount) || remainAmount < 0) {
@@ -869,7 +867,6 @@ export class CashierService {
           customerContact,
           discountType,
           discountValue: discountValueNum,
-          tinyDiscount: tinyDiscountValue,
         },
       });
 
@@ -976,7 +973,6 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
-        tinyDiscount: true,
         cashAmount: true,
         cardAmount: true,
         invoices: {
@@ -1120,31 +1116,10 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
-        tinyDiscount: true,
       },
     });
 
     if (!p) return [];
-
-    const header: Record<string, any> = {
-      sale_invoice_id: p.saleInvoiceId?.toString(),
-      payment_amount: Number(p.amount ?? 0),
-      payment_remain_amount: Number(p.remainAmount ?? 0),
-      payment_type: p.type === 'CARD' ? 'Card' : 'Cash',
-      payment_file_name: p.fileName ?? null,
-      payment_date:
-        typeof p.date === 'bigint' ? Number(p.date) : Number(p.date ?? 0),
-      payment_user_id: p.userId ?? 0,
-      customer_contact: p.customerContact ?? null,
-      discount_type:
-        p.discountType === 'PERCENTAGE'
-          ? 'percentage'
-          : p.discountType === 'AMOUNT'
-          ? 'amount'
-          : 'no',
-      discount_value: Number(p.discountValue ?? 0),
-      tiny_discount: Number(p.tinyDiscount ?? 0),
-    };
 
     const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
       Prisma.sql`
@@ -1169,6 +1144,32 @@ export class CashierService {
         ORDER BY inv.id ASC
       `,
     );
+
+    const tinyDiscountFromInvoices = rows.reduce(
+      (sum, r) => sum + Number(r.tiny_discount ?? 0),
+      0,
+    );
+
+    const header: Record<string, any> = {
+      sale_invoice_id: p.saleInvoiceId?.toString(),
+      payment_amount: Number(p.amount ?? 0),
+      payment_remain_amount: Number(p.remainAmount ?? 0),
+      payment_type: p.type === 'CARD' ? 'Card' : 'Cash',
+      payment_file_name: p.fileName ?? null,
+      payment_date:
+        typeof p.date === 'bigint' ? Number(p.date) : Number(p.date ?? 0),
+      payment_user_id: p.userId ?? 0,
+      customer_contact: p.customerContact ?? null,
+      discount_type:
+        p.discountType === 'PERCENTAGE'
+          ? 'percentage'
+          : p.discountType === 'AMOUNT'
+          ? 'amount'
+          : 'no',
+      discount_value: Number(p.discountValue ?? 0),
+      tiny_discount: tinyDiscountFromInvoices,
+      total_tiny_discounts: tinyDiscountFromInvoices,
+    };
 
     const lineMaps = rows.map((r) => {
       const qty = Number(r.quantity ?? 0);
