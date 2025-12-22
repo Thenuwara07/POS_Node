@@ -197,6 +197,7 @@ model Payment {
   customerContact String?             @map("customer_contact")
   discountType    PaymentDiscountType @default(NO) @map("discount_type")
   discountValue   Float               @default(0) @map("discount_value")
+  tinyDiscount    Float               @default(0) @map("tiny_discount")
 
   invoices   Invoice[]
   user       User?       @relation(fields: [userId], references: [id])
@@ -214,6 +215,7 @@ model Invoice {
   itemId         Int    @map("item_id")
   quantity       Int
   unitSaledPrice Float  @map("unit_saled_price")
+  tinyDiscount   Float  @default(0) @map("tiny_discount")
   saleInvoiceId  String @map("sale_invoice_id")
 
   item        Item     @relation(fields: [itemId], references: [id])

@@ -58,6 +58,7 @@ export class CashierService {
     customerContact: string | null;
     discountType: PaymentDiscountType;
     discountValue: number;
+    tinyDiscount: number;
     cashAmount?: number;
     cardAmount?: number;
   }): PaymentRecordDto {
@@ -89,6 +90,7 @@ export class CashierService {
       customer_contact: p.customerContact ?? null,
       discount_type: discountStr,
       discount_value: p.discountValue,
+      tiny_discount: Number(p.tinyDiscount ?? 0),
     };
   }
 
@@ -217,6 +219,7 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
+        tinyDiscount: true,
       },
     });
 
@@ -239,6 +242,7 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
+        tinyDiscount: true,
         cashAmount: true,
         cardAmount: true,
         invoices: {
@@ -247,6 +251,7 @@ export class CashierService {
             itemId: true,
             quantity: true,
             unitSaledPrice: true,
+            tinyDiscount: true,
             item: {
               select: {
                 name: true,
@@ -260,14 +265,15 @@ export class CashierService {
 
     return rows.map((p) => ({
       ...this.mapPaymentRecord(p),
-      items: (p.invoices ?? []).map((inv) => ({
-        item_id: inv.itemId,
-        batch_id: inv.batchId,
-        quantity: inv.quantity,
-        unit_saled_price: inv.unitSaledPrice,
-        name: inv.item?.name ?? null,
-        category: inv.item?.category?.category ?? null,
-      })),
+        items: (p.invoices ?? []).map((inv) => ({
+          item_id: inv.itemId,
+          batch_id: inv.batchId,
+          quantity: inv.quantity,
+          unit_saled_price: inv.unitSaledPrice,
+          tiny_discount: Number(inv.tinyDiscount ?? 0),
+          name: inv.item?.name ?? null,
+          category: inv.item?.category?.category ?? null,
+        })),
     }));
   }
 
@@ -344,6 +350,7 @@ export class CashierService {
           customerContact,
           discountType: discountEnum,
           discountValue: dto.discount_value ?? 0,
+          tinyDiscount: dto.tiny_discount ?? 0,
         },
       });
 
@@ -562,8 +569,10 @@ export class CashierService {
         quantity: number;
         unitSaledPrice: number;
         saleInvoiceId: string;
+        tinyDiscount: number;
       }> = [];
       let totalAmount = 0;
+      let totalTinyFromLines = 0;
 
       for (const inv of invoices) {
         const qty = Number(inv.quantity ?? 0);
@@ -605,35 +614,60 @@ export class CashierService {
           );
         }
 
+        const lineTinyDiscount = Number(inv.tiny_discount ?? 0);
+        if (!Number.isFinite(lineTinyDiscount) || lineTinyDiscount < 0) {
+          throw new BadRequestException(
+            `tiny_discount must be >= 0 for batch_id=${batchId}, item_id=${itemId}`,
+          );
+        }
+
+        const lineTotal = priceNum * Math.trunc(qty);
+        if (lineTinyDiscount > lineTotal) {
+          throw new BadRequestException(
+            `tiny_discount cannot exceed line total for batch_id=${batchId}, item_id=${itemId}`,
+          );
+        }
+
         data.push({
           batchId,
           itemId,
           quantity: Math.trunc(qty),
           unitSaledPrice: priceNum,
+          tinyDiscount: lineTinyDiscount,
           saleInvoiceId: saleInvoiceId,
         });
-        totalAmount += priceNum * Math.trunc(qty);
+        totalAmount += lineTotal;
+        totalTinyFromLines += lineTinyDiscount;
       }
+
+      const fallbackTiny = Number(dto.tiny_discount ?? 0);
+      const tinyDiscountValue =
+        totalTinyFromLines > 0
+          ? totalTinyFromLines
+          : Number.isFinite(fallbackTiny) && fallbackTiny > 0
+          ? Math.min(fallbackTiny, totalAmount)
+          : 0;
+      const paymentAmount = Math.max(0, totalAmount - tinyDiscountValue);
 
       let remainAmount = Number(dto.remain_amount ?? 0);
       if (!Number.isFinite(remainAmount) || remainAmount < 0) {
         remainAmount = 0;
       }
-      if (remainAmount > totalAmount) {
-        remainAmount = totalAmount;
+      if (remainAmount > paymentAmount) {
+        remainAmount = paymentAmount;
       }
 
       const cashAmount =
         dto.type === 'Split'
           ? Number(dto.cash_amount ?? 0)
           : dto.type === 'Cash'
-          ? totalAmount
+          ? paymentAmount
           : 0;
       const cardAmount =
         dto.type === 'Split'
           ? Number(dto.card_amount ?? 0)
           : dto.type === 'Card'
-          ? totalAmount
+          ? paymentAmount
           : 0;
 
       if (dto.type === 'Split') {
@@ -644,7 +678,7 @@ export class CashierService {
         if (!Number.isFinite(cardAmount) || cardAmount < 0) {
           throw new BadRequestException('card_amount must be >= 0 for split');
         }
-        if (Math.abs(sum - totalAmount) > 0.01) {
+        if (Math.abs(sum - paymentAmount) > 0.01) {
           throw new BadRequestException(
             'cash_amount + card_amount must equal total amount for split',
           );
@@ -653,21 +687,22 @@ export class CashierService {
 
       const payment = await tx.payment.create({
         data: {
-          amount: totalAmount,
-          remainAmount,
-          date: BigInt(whenMs),
-          fileName:
-            dto.file_name?.toString().trim() ||
-            `sale-${saleInvoiceId}`.slice(0, 200),
-          type: paymentType,
-          cashAmount,
-          cardAmount,
-          saleInvoiceId,
-          userId: dto.user_id ?? null,
-          customerContact,
-          discountType: discountEnum,
-          discountValue: dto.discount_value ?? 0,
-        },
+        amount: paymentAmount,
+        remainAmount,
+        date: BigInt(whenMs),
+        fileName:
+          dto.file_name?.toString().trim() ||
+          `sale-${saleInvoiceId}`.slice(0, 200),
+        type: paymentType,
+        cashAmount,
+        cardAmount,
+        saleInvoiceId,
+        userId: dto.user_id ?? null,
+        customerContact,
+        discountType: discountEnum,
+        discountValue: dto.discount_value ?? 0,
+        tinyDiscount: tinyDiscountValue,
+      },
       });
 
       const invResult = await tx.invoice.createMany({ data });
@@ -776,12 +811,19 @@ export class CashierService {
       total = 0;
     }
 
+    const rawTinyDiscount = Number(dto.tiny_discount ?? 0);
+    const tinyDiscountValue =
+      Number.isFinite(rawTinyDiscount) && rawTinyDiscount > 0
+        ? Math.min(rawTinyDiscount, total)
+        : 0;
+    const totalAfterTiny = Math.max(0, total - tinyDiscountValue);
+
     let remainAmount = Number(dto.remain_amount ?? 0);
     if (!Number.isFinite(remainAmount) || remainAmount < 0) {
       remainAmount = 0;
     }
-    if (remainAmount > total) {
-      remainAmount = total;
+    if (remainAmount > totalAfterTiny) {
+      remainAmount = totalAfterTiny;
     }
 
     const paymentType: PaymentMethod =
@@ -815,7 +857,7 @@ export class CashierService {
 
       const payment = await tx.payment.create({
         data: {
-          amount: total,
+          amount: totalAfterTiny,
           remainAmount,
           date: BigInt(whenMs),
           fileName:
@@ -827,6 +869,7 @@ export class CashierService {
           customerContact,
           discountType,
           discountValue: discountValueNum,
+          tinyDiscount: tinyDiscountValue,
         },
       });
 
@@ -867,7 +910,7 @@ export class CashierService {
 
       return {
         sale_invoice_id: saleInvoiceId,
-        total,
+        total: totalAfterTiny,
         payment: paymentDto,
         quick_sales: quickSales,
       };
@@ -933,6 +976,7 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
+        tinyDiscount: true,
         cashAmount: true,
         cardAmount: true,
         invoices: {
@@ -941,6 +985,7 @@ export class CashierService {
             itemId: true,
             quantity: true,
             unitSaledPrice: true,
+            tinyDiscount: true,
             item: {
               select: {
                 name: true,
@@ -959,6 +1004,7 @@ export class CashierService {
         batch_id: inv.batchId,
         quantity: inv.quantity,
         unit_saled_price: inv.unitSaledPrice,
+        tiny_discount: Number(inv.tinyDiscount ?? 0),
         name: inv.item?.name ?? null,
         category: inv.item?.category?.category ?? null,
       })),
@@ -1074,6 +1120,7 @@ export class CashierService {
         customerContact: true,
         discountType: true,
         discountValue: true,
+        tinyDiscount: true,
       },
     });
 
@@ -1096,6 +1143,7 @@ export class CashierService {
           ? 'amount'
           : 'no',
       discount_value: Number(p.discountValue ?? 0),
+      tiny_discount: Number(p.tinyDiscount ?? 0),
     };
 
     const rows = await this.prisma.$queryRaw<Array<Record<string, any>>>(
@@ -1104,6 +1152,7 @@ export class CashierService {
           inv.id               AS invoice_id,
           inv.batch_id         AS batch_id,
           inv.item_id          AS item_id,
+          inv.tiny_discount    AS tiny_discount,
           inv.quantity         AS quantity,
           inv.unit_saled_price AS unit_saled_price,
           i.name               AS item_name,
@@ -1141,7 +1190,8 @@ export class CashierService {
         sell_price: Number(r.sell_price ?? 0),
         discount_amount: Number(r.discount_amount ?? 0),
         final_unit_price: Number(r.final_unit_price ?? 0),
-          line_total: Number(r.line_total ?? 0),
+        line_total: Number(r.line_total ?? 0),
+        tiny_discount: Number(r.tiny_discount ?? 0),
       };
     });
 

@@ -112,6 +112,12 @@ export class CreateQuickSaleDto {
   @Min(0)
   discount_value: number = 0;
 
+  @ApiPropertyOptional({ name: 'tiny_discount', example: 0 })
+  @Transform(({ value }) => (value == null ? 0 : Number(value)))
+  @IsNumber()
+  @Min(0)
+  tiny_discount: number = 0;
+
   @ApiPropertyOptional({
     name: 'remain_amount',
     example: 0,

@@ -111,4 +111,10 @@ export class CreatePaymentDto {
   @IsNumber()
   @Min(0)
   discount_value!: number;
+
+  @ApiPropertyOptional({ name: 'tiny_discount', example: 0.0 })
+  @Transform(({ value }) => (value == null ? 0 : Number(value)))
+  @IsNumber()
+  @Min(0)
+  tiny_discount?: number;
 }

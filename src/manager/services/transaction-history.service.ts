@@ -65,6 +65,7 @@ export class TransactionHistoryService {
       ref_no: p.saleInvoiceId ?? p.fileName, // choose which you like
       type: p.type, // CASH / CARD
       amount: p.amount,
+      tiny_discount: Number(p.tinyDiscount ?? 0),
       date: p.date, // BigInt epoch ms
       user_id: p.userId,
       cashier_name: p.user?.name ?? null, // extra, if you want
