@@ -1,4 +1,11 @@
-import { IsString, IsEmail, IsOptional, IsNotEmpty, MinLength } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsNotEmpty,
+  MinLength,
+  Matches,
+} from 'class-validator';
 
 export class CreateManagerDto {
   @IsString()
@@ -10,10 +17,18 @@ export class CreateManagerDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^(?:\+94|94|0)?7\d{8}$/, {
+    message:
+      'Contact must be a valid Sri Lankan mobile number (e.g. 0771234567 or +94771234567).',
+  })
   contact: string;
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^(?:\d{9}[vVxX]|\d{12})$/, {
+    message:
+      'NIC must be a valid Sri Lankan NIC (old: 123456789V, new: 200012345678).',
+  })
   nic: string;
 
   @IsString()
