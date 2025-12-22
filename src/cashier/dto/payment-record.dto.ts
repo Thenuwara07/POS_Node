@@ -15,4 +15,5 @@ export class PaymentRecordDto {
   @ApiProperty({ name: 'customer_contact', nullable: true }) customer_contact!: string | null;
   @ApiProperty({ name: 'discount_type' }) discount_type!: 'no' | 'percentage' | 'amount';
   @ApiProperty({ name: 'discount_value' }) discount_value!: number;
+  @ApiProperty({ name: 'total_tiny_discounts' }) total_tiny_discounts!: number;
 }
