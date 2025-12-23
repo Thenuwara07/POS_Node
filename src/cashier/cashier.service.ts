@@ -417,6 +417,7 @@ export class CashierService {
           quantity: number;
           unitSaledPrice: number;
           saleInvoiceId: string;
+          tinyDiscount: number;
         }> = [];
 
         for (const inv of dto.invoices) {
@@ -457,12 +458,27 @@ export class CashierService {
             );
           }
 
+          const lineTinyDiscount = Number(inv.tiny_discount ?? 0);
+          if (!Number.isFinite(lineTinyDiscount) || lineTinyDiscount < 0) {
+            throw new BadRequestException(
+              `tiny_discount must be >= 0 for batch_id=${batchId}, item_id=${itemId}`,
+            );
+          }
+
+          const lineTotal = priceNum * Math.trunc(qty);
+          if (lineTinyDiscount > lineTotal) {
+            throw new BadRequestException(
+              `tiny_discount cannot exceed line total for batch_id=${batchId}, item_id=${itemId}`,
+            );
+          }
+
           data.push({
             batchId,
             itemId,
             quantity: Math.trunc(qty),
             unitSaledPrice: priceNum,
             saleInvoiceId: saleId,
+            tinyDiscount: lineTinyDiscount,
           });
         }
 
@@ -581,9 +597,9 @@ export class CashierService {
         quantity: number;
         unitSaledPrice: number;
         saleInvoiceId: string;
+        tinyDiscount: number;
       }> = [];
       let totalAmount = 0;
-      let totalTinyFromLines = 0;
 
       for (const inv of invoices) {
         const qty = Number(inv.quantity ?? 0);
@@ -645,13 +661,12 @@ export class CashierService {
           quantity: Math.trunc(qty),
           unitSaledPrice: priceNum,
           saleInvoiceId: saleInvoiceId,
+          tinyDiscount: lineTinyDiscount,
         });
         totalAmount += lineTotal;
-        totalTinyFromLines += lineTinyDiscount;
       }
 
-      const tinyDiscountValue = Math.max(0, totalTinyFromLines);
-      const paymentAmount = Math.max(0, totalAmount - tinyDiscountValue);
+      const paymentAmount = Math.max(0, totalAmount);
 
       let remainAmount = Number(dto.remain_amount ?? 0);
       if (!Number.isFinite(remainAmount) || remainAmount < 0) {
@@ -691,21 +706,21 @@ export class CashierService {
 
       const payment = await tx.payment.create({
         data: {
-        amount: paymentAmount,
-        remainAmount,
-        date: BigInt(whenMs),
-        fileName:
-          dto.file_name?.toString().trim() ||
-          `sale-${saleInvoiceId}`.slice(0, 200),
-        type: paymentType,
-        cashAmount,
-        cardAmount,
-        saleInvoiceId,
-        userId: dto.user_id ?? null,
-        customerContact,
-        discountType: discountEnum,
-        discountValue: dto.discount_value ?? 0,
-      },
+          amount: paymentAmount,
+          remainAmount,
+          date: BigInt(whenMs),
+          fileName:
+            dto.file_name?.toString().trim() ||
+            `sale-${saleInvoiceId}`.slice(0, 200),
+          type: paymentType,
+          cashAmount,
+          cardAmount,
+          saleInvoiceId,
+          userId: dto.user_id ?? null,
+          customerContact,
+          discountType: discountEnum,
+          discountValue: dto.discount_value ?? 0,
+        },
       });
 
       const invResult = await tx.invoice.createMany({ data });
