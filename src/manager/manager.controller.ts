@@ -435,6 +435,38 @@ export class ManagerController {
       throw new InternalServerErrorException('Failed to fetch cash payments');
     }
   }
+  @Patch('deactivate-user/:id')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('MANAGER')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'Deactivate a user (status true -> false)' })
+async deactivateUser(@Req() req: any, @Param('id') id: string) {
+  try {
+    const actorUserId = this.resolveUserId(req?.user);
+    return await this.managerService.deactivateUser(Number(id), actorUserId);
+  } catch (err: any) {
+    if (err?.status && err?.response) throw err;
+    this.logger.error('Failed to deactivate user', err?.stack || err);
+    throw new InternalServerErrorException('Failed to deactivate user');
+  }
+}
+
+@Patch('activate-user/:id') // ✅ optional but recommended
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('MANAGER')
+@ApiBearerAuth('JWT-auth')
+@ApiOperation({ summary: 'Activate a user (status false -> true)' })
+async activateUser(@Req() req: any, @Param('id') id: string) {
+  try {
+    const actorUserId = this.resolveUserId(req?.user);
+    return await this.managerService.activateUser(Number(id), actorUserId);
+  } catch (err: any) {
+    if (err?.status && err?.response) throw err;
+    this.logger.error('Failed to activate user', err?.stack || err);
+    throw new InternalServerErrorException('Failed to activate user');
+  }
+}
+
 
   @Get('reports/daily-sales')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
