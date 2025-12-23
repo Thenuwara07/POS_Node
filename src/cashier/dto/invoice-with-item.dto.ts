@@ -18,4 +18,7 @@ export class InvoiceWithItemDto {
 
   @ApiPropertyOptional({ example: 'electronics', nullable: true })
   category!: string | null;
+
+  @ApiPropertyOptional({ name: 'tiny_discount', example: 0 })
+  tiny_discount!: number;
 }
