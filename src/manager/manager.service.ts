@@ -361,6 +361,97 @@ export class ManagerService {
     }
   }
 
+  // ✅ Deactivate user (status true -> false)
+async deactivateUser(targetUserId: number, actorUserId: number) {
+  try {
+    if (targetUserId === actorUserId) {
+      throw new BadRequestException('You cannot deactivate your own account.');
+    }
+
+    const existing = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) throw new NotFoundException('User not found');
+
+    if (existing.status === false) {
+      return {
+        message: 'User already deactivated',
+        id: existing.id,
+        status: false,
+      };
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: {
+        status: false,
+        updatedAt: new Date(),
+        updatedById: actorUserId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        contact: true,
+        nic: true,
+        role: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
+
+    return { message: 'User deactivated successfully', user: updated };
+  } catch (err) {
+    this.handlePrismaError(err, 'deactivateUser');
+  }
+}
+
+// ✅ Activate user (status false -> true) [optional but recommended]
+async activateUser(targetUserId: number, actorUserId: number) {
+  try {
+    const existing = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) throw new NotFoundException('User not found');
+
+    if (existing.status === true) {
+      return {
+        message: 'User already active',
+        id: existing.id,
+        status: true,
+      };
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: {
+        status: true,
+        updatedAt: new Date(),
+        updatedById: actorUserId,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        contact: true,
+        nic: true,
+        role: true,
+        status: true,
+        updatedAt: true,
+      },
+    });
+
+    return { message: 'User activated successfully', user: updated };
+  } catch (err) {
+    this.handlePrismaError(err, 'activateUser');
+  }
+}
+
+
   async findAllItems() {
     try {
       const items = await this.prisma.item.findMany({
@@ -416,6 +507,7 @@ export class ManagerService {
           email: true,
           nic: true,
           role: true,
+          status: true,
           createdAt: true,
         },
       });
@@ -559,6 +651,7 @@ export class ManagerService {
       this.handlePrismaError(err, 'findAllCashPayments');
     }
   }
+  
 
   async findAllDailySales() {
     try {
@@ -587,4 +680,5 @@ export class ManagerService {
       this.handlePrismaError(err, 'findAllInvoices');
     }
   }
+  
 }
