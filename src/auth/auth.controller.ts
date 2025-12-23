@@ -4,14 +4,19 @@ import {
   Get,
   Post,
   Req,
-  Res,
   UseGuards,
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiBody,ApiBearerAuth  } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { LoginDto } from './dto/login.dto';
 
 @ApiTags('auth')
@@ -35,12 +40,12 @@ export class AuthController {
   @ApiBody({ type: LoginDto })
   async login(@Body() body: LoginDto) {
     const { email, password } = body;
+
     const user = await this.authService.validateUser(email, password);
     if (!user) throw new UnauthorizedException('Invalid credentials');
 
     const result = await this.authService.login(user);
 
-    // 🚀 Return tokens directly in response (no cookies)
     return {
       access_token: result.access_token,
       refresh_token: result.refresh_token,
@@ -48,7 +53,6 @@ export class AuthController {
     };
   }
 
-  // Refresh endpoint
   @UseGuards(AuthGuard('jwt-refresh'))
   @Post('refresh')
   @ApiBearerAuth('JWT-auth')
@@ -60,24 +64,23 @@ export class AuthController {
 
     const result = await this.authService.refreshTokens(userId, incoming);
 
-    // 🚀 Return new tokens in response
     return {
       access_token: result.access_token,
-      refresh_token: result.refresh_token
+      refresh_token: result.refresh_token,
     };
   }
 
-  // Logout (invalidate refresh token in DB if you’re storing them)
+  // ✅ FIXED: logout must be protected, otherwise req.user is empty
+  @UseGuards(AuthGuard('jwt'))
   @Post('logout')
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({ summary: 'Logout user (invalidate refresh token)' })
   @ApiResponse({ status: 200, description: 'Successfully logged out' })
   async logout(@Req() req: any) {
-    await this.authService.logout(req.user?.sub); // ✅ call service
+    await this.authService.logout(req.user?.sub);
     return { message: 'Logged out' };
   }
 
-  // Example protected route
   @UseGuards(AuthGuard('jwt'))
   @Get('me')
   @ApiBearerAuth('JWT-auth')
