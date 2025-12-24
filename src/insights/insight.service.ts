@@ -38,12 +38,12 @@ export class InsightService {
       JOIN "payment" pay
         ON pay."sale_invoice_id" = inv."sale_invoice_id"
       WHERE pay."user_id" = ${stockkeeperId}
-        AND pay."date" BETWEEN ${r.fromMs} AND ${r.toMs}
+        AND pay."date" >= ${r.fromMs} 
+        AND pay."date" <= ${r.toMs}
     `;
 
     const row = rows[0] ?? { total_sales: 0, customers: 0, products: 0 };
 
-    // (Optional) audit the view
     await this.audit('INSIGHT_HEADER', r, stockkeeperId);
 
     return {
@@ -63,7 +63,6 @@ export class InsightService {
     const r = this.resolveRange(period, fromIso, toIso);
     if (limit <= 0) limit = 10;
 
-    // Group by item over the filtered window
     const rows = await this.prisma.$queryRaw<
       { item_id: number; name: string; sold: number; avg_price: number }[]
     >`
@@ -78,7 +77,8 @@ export class InsightService {
       JOIN "item" it
         ON it."id" = inv."item_id"
       WHERE pay."user_id" = ${stockkeeperId}
-        AND pay."date" BETWEEN ${r.fromMs} AND ${r.toMs}
+        AND pay."date" >= ${r.fromMs} 
+        AND pay."date" <= ${r.toMs}
       GROUP BY it."id", it."name"
       ORDER BY sold DESC, item_id ASC
       LIMIT ${limit}
@@ -107,20 +107,29 @@ export class InsightService {
       { day: string; total: number }[]
     >`
       SELECT
-        TO_CHAR((to_timestamp(pay."date" / 1000)::date), 'YYYY-MM-DD') AS day,
+        TO_CHAR(to_timestamp(pay."date" / 1000), 'YYYY-MM-DD') AS day,
         COALESCE(SUM(inv."quantity" * inv."unit_saled_price"), 0)::float AS total
       FROM "invoice" inv
       JOIN "payment" pay
         ON pay."sale_invoice_id" = inv."sale_invoice_id"
       WHERE pay."user_id" = ${stockkeeperId}
-        AND pay."date" BETWEEN ${r.fromMs} AND ${r.toMs}
-      GROUP BY to_timestamp(pay."date" / 1000)::date
+        AND pay."date" >= ${r.fromMs} 
+        AND pay."date" <= ${r.toMs}
+      GROUP BY TO_CHAR(to_timestamp(pay."date" / 1000), 'YYYY-MM-DD')
       ORDER BY day ASC
     `;
 
     await this.audit('INSIGHT_SALES_TREND', r, stockkeeperId);
 
-    return rows.map((r) => ({ day: r.day, total: r.total || 0 }));
+    // Map to ChartSeriesDto with proper label formatting
+    return rows.map((r) => {
+      const date = new Date(r.day);
+      return {
+        day: r.day,
+        label: this.formatDateLabel(date, period),
+        total: r.total || 0,
+      };
+    });
   }
 
   // ---------- helpers ----------
@@ -141,45 +150,83 @@ export class InsightService {
     }
 
     const now = new Date();
-    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+    const startOfDay = (d: Date) => {
+      const copy = new Date(d);
+      copy.setHours(0, 0, 0, 0);
+      return copy;
+    };
+    const endOfDay = (d: Date) => {
+      const copy = new Date(d);
+      copy.setHours(23, 59, 59, 999);
+      return copy;
+    };
 
     let fromDate: Date;
-    let toDate: Date = now;
+    let toDate: Date;
 
     switch (period) {
       case InsightPeriod.TODAY:
         fromDate = startOfDay(now);
-        toDate = now;
+        toDate = now; // Up to current moment
         break;
+      
       case InsightPeriod.LAST_7_DAYS: {
-        const s = startOfDay(now);
-        s.setDate(s.getDate() - 6);
-        fromDate = s;
+        // Last 7 days including today
+        const start = startOfDay(now);
+        start.setDate(start.getDate() - 6);
+        fromDate = start;
+        toDate = endOfDay(now); // Include full today
         break;
       }
+      
       case InsightPeriod.LAST_30_DAYS: {
-        const s = startOfDay(now);
-        s.setDate(s.getDate() - 29);
-        fromDate = s;
+        // Last 30 days including today
+        const start = startOfDay(now);
+        start.setDate(start.getDate() - 29);
+        fromDate = start;
+        toDate = endOfDay(now); // Include full today
         break;
       }
+      
       case InsightPeriod.THIS_MONTH:
-        fromDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        // From start of current month to now
+        fromDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+        toDate = endOfDay(now); // Include full today
         break;
+      
       case InsightPeriod.CUSTOM:
       default:
         // Default fallback to last 7 days
-        const s = startOfDay(now);
-        s.setDate(s.getDate() - 6);
-        fromDate = s;
+        const start = startOfDay(now);
+        start.setDate(start.getDate() - 6);
+        fromDate = start;
+        toDate = endOfDay(now);
         break;
     }
 
-    // If not “today”, cap to endOfDay(now) for consistency
-    const capTo = period === InsightPeriod.TODAY ? toDate : endOfDay(now);
+    return { 
+      fromMs: this.dateToEpochMs(fromDate), 
+      toMs: this.dateToEpochMs(toDate) 
+    };
+  }
 
-    return { fromMs: this.dateToEpochMs(fromDate), toMs: this.dateToEpochMs(capTo) };
+  private formatDateLabel(date: Date, period?: InsightPeriod): string {
+    const day = date.getDate();
+    const month = date.toLocaleString('en-US', { month: 'short' });
+    
+    // For TODAY, show hours if multiple data points
+    if (period === InsightPeriod.TODAY) {
+      const hours = date.getHours();
+      return `${hours}:00`;
+    }
+    
+    // For 7 days, show day + short month
+    if (period === InsightPeriod.LAST_7_DAYS) {
+      return `${day} ${month}`;
+    }
+    
+    // For 30 days or month, show day + month
+    return `${day} ${month}`;
   }
 
   private dateToEpochMs(d: Date): bigint {
@@ -207,7 +254,7 @@ export class InsightService {
         },
       });
     } catch {
-      // don’t block the main response on audit errors
+      // don't block the main response on audit errors
     }
   }
 }
