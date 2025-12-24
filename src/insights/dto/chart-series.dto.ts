@@ -2,9 +2,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 
 export class ChartSeriesDto {
-  @ApiProperty({ example: '2025-10-15' })
-  day!: string; // YYYY-MM-DD (store as date label for charts)
+  @ApiProperty({ example: '2025-12-24', description: 'Date in YYYY-MM-DD format' })
+  day!: string;
 
-  @ApiProperty({ example: 25340.5 })
-  total!: number; // total sales that day
+  @ApiProperty({ example: '24 Dec', description: 'Formatted label for chart display' })
+  label!: string;
+
+  @ApiProperty({ example: 15420.50, description: 'Total sales for this day' })
+  total!: number;
 }
