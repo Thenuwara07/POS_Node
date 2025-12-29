@@ -9,7 +9,6 @@ import {
   Min,
   IsHexColor,
   IsNumber,
-  IsPositive,
 } from 'class-validator';
 
 export class CreateItemWithStockDto {
@@ -21,7 +20,9 @@ export class CreateItemWithStockDto {
   @ApiPropertyOptional({ example: '8901234567890' })
   @IsString()
   @IsOptional()
-  @Transform(({ value }) => (value === '' ? undefined : value))
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : value,
+  )
   barcode?: string;
 
   @ApiProperty()
@@ -37,7 +38,11 @@ export class CreateItemWithStockDto {
   supplierId!: number;
 
   @ApiPropertyOptional()
-  @Transform(({ value }) => (value === '' ? undefined : parseInt(value, 10)))
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined
+      ? undefined
+      : parseInt(value, 10),
+  )
   @IsInt()
   @Min(0)
   @IsOptional()
@@ -54,6 +59,9 @@ export class CreateItemWithStockDto {
   remark?: string;
 
   @ApiPropertyOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : value,
+  )
   @IsHexColor()
   @IsOptional()
   colorCode?: string;
@@ -67,23 +75,35 @@ export class CreateItemWithStockDto {
   imageBase64?: string;
 
   @ApiPropertyOptional()
-  @Transform(({ value }) => (value === '' ? undefined : parseInt(value, 10)))
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined
+      ? undefined
+      : parseInt(value, 10),
+  )
   @IsInt()
-  @IsPositive()
+  @Min(0)
   @IsOptional()
   quantity?: number;
 
   @ApiPropertyOptional()
-  @Transform(({ value }) => (value === '' ? undefined : parseFloat(value)))
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined
+      ? undefined
+      : parseFloat(value),
+  )
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   @IsOptional()
   unitPrice?: number;
 
   @ApiPropertyOptional()
-  @Transform(({ value }) => (value === '' ? undefined : parseFloat(value)))
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined
+      ? undefined
+      : parseFloat(value),
+  )
   @IsNumber()
-  @IsPositive()
+  @Min(0)
   @IsOptional()
   sellPrice?: number;
 }
